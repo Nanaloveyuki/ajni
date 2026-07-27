@@ -67,85 +67,11 @@ pub fn emit_for_test(kind : Int, first : Int, second : Int) -> Unit {
 }
 
 ///|
-/// Creates a WebView in the Kotlin host's attached `FrameLayout` and starts
-/// navigating to `url`. The command is always queued on Android's main Looper.
-pub fn webview_create(handle : Int64, url : String) -> Unit raise JniError {
-  webview_command(1, handle, url)
-}
-
-///|
-pub fn webview_navigate(handle : Int64, url : String) -> Unit raise JniError {
-  webview_command(2, handle, url)
-}
-
-///|
-pub fn webview_load_html(handle : Int64, html : String) -> Unit raise JniError {
-  webview_command(3, handle, html)
-}
-
-///|
-pub fn webview_eval(handle : Int64, script : String) -> Unit raise JniError {
-  webview_command(4, handle, script)
-}
-
-///|
-pub fn webview_destroy(handle : Int64) -> Unit raise JniError {
-  webview_command(5, handle, "")
-}
-
-///|
-pub fn webview_set_bounds(
-  handle : Int64,
-  x : Int,
-  y : Int,
-  width : Int,
-  height : Int,
-) -> Unit raise JniError {
-  if native_webview_set_bounds(handle, x, y, width, height) == 0 {
-    raise NotInitialized
-  }
-}
-
-///|
-fn webview_command(
-  command : Int,
-  handle : Int64,
-  payload : String,
-) -> Unit raise JniError {
-  if native_webview_command(command, handle, encode_utf8(payload)) == 0 {
-    raise NotInitialized
-  }
-}
-
-///|
 /// Stable C export used by the Android JNI bridge. Applications embedding the
 /// MoonBit native artifact link this symbol as `ajni_dispatch_event`; callers
 /// must still install their own event handler to observe the event payload.
 pub fn dispatch_from_android(kind : Int, first : Int, second : Int) -> Unit {
   dispatch_native_event(kind, first, second)
-}
-
-///|
-/// Stable C export for UTF-8 WebView callbacks. The native bridge invokes this
-/// only after the Kotlin host has returned to its Android UI thread.
-pub fn dispatch_webview_from_android(
-  kind : Int,
-  handle : Int64,
-  payload : Bytes,
-) -> Unit {
-  let event = match kind {
-    30 => WebViewEvent::Created(decode_utf8(payload))
-    31 => NavigationStarted(decode_utf8(payload))
-    32 => NavigationFinished(decode_utf8(payload))
-    33 => TitleChanged(decode_utf8(payload))
-    34 => ScriptResult(decode_utf8(payload))
-    35 => Failed(decode_utf8(payload))
-    36 => Destroyed
-    _ => return
-  }
-  for _, handler in handlers {
-    handler(WebView(handle, event))
-  }
 }
 
 ///|

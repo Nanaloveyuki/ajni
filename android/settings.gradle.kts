@@ -17,4 +17,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "ajni-demo"
+include(":host")
 include(":app")

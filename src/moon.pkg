@@ -5,12 +5,7 @@ import {
 options(
   "native-stub": [ "ajni_bridge.c" ],
   link: {
-    "native": {
-      "exports": [
-        "dispatch_from_android:ajni_dispatch_event",
-        "dispatch_webview_from_android:ajni_dispatch_webview_event",
-      ],
-    },
+    "native": { "exports": [ "dispatch_from_android:ajni_dispatch_event" ] },
   },
   targets: { "ffi.mbt": [ "native" ] },
 )

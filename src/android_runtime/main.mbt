@@ -6,8 +6,13 @@ pub fn dispatch(kind : Int, first : Int, second : Int) -> Unit {
 }
 
 ///|
-pub fn dispatch_webview(kind : Int, handle : Int64, payload : Bytes) -> Unit {
-  @ajni.dispatch_webview_from_android(kind, handle, payload)
+pub fn dispatch_webview(
+  kind : Int,
+  handle : Int64,
+  payload : Bytes,
+  detail : Bytes,
+) -> Unit {
+  @webview.dispatch_from_android(kind, handle, payload, detail)
 }
 
 ///|

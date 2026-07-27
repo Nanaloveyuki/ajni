@@ -21,7 +21,7 @@ android {
     minSdk = 24
     targetSdk = 35
     versionCode = 1
-    versionName = "0.1.0"
+    versionName = "0.1.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     externalNativeBuild {
@@ -60,6 +60,7 @@ kotlin {
 }
 
 dependencies {
+  implementation(project(":host"))
   implementation("androidx.activity:activity-ktx:1.9.3")
   implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
   implementation("androidx.lifecycle:lifecycle-process:2.8.7")

@@ -1,4 +1,4 @@
-package dev.nanaloveyuki.ajni.demo
+package dev.nanaloveyuki.ajni.host
 
 import android.content.Context
 import android.os.Handler
@@ -7,7 +7,8 @@ import android.view.Surface
 import android.widget.FrameLayout
 import java.util.concurrent.atomic.AtomicBoolean
 
-internal object NativeBridge {
+/** Stable JNI entry class for applications that link ajni's native library. */
+object NativeBridge {
   private val initialized = AtomicBoolean(false)
   private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -64,16 +65,16 @@ internal object NativeBridge {
   }
 
   @JvmStatic
-  fun webViewCommand(command: Int, handle: Long, payload: String): Boolean =
-    AjniWebViewHost.command(command, handle, payload)
+  fun webViewCommand(command: Int, handle: Long, payload: String, requestId: String): Boolean =
+    AjniWebViewHost.command(command, handle, payload, requestId)
 
   @JvmStatic
   fun webViewSetBounds(handle: Long, x: Int, y: Int, width: Int, height: Int): Boolean =
     AjniWebViewHost.setBounds(handle, x, y, width, height)
 
   @JvmStatic
-  fun webViewEvent(kind: Int, handle: Long, payload: String) {
-    if (initialized.get()) nativeWebViewEvent(kind, handle, payload)
+  fun webViewEvent(kind: Int, handle: Long, payload: String, detail: String = "") {
+    if (initialized.get()) nativeWebViewEvent(kind, handle, payload, detail)
   }
 
   @JvmStatic private external fun nativeInitialize(context: Context)
@@ -85,5 +86,5 @@ internal object NativeBridge {
   @JvmStatic private external fun nativeOnUiTask()
   @JvmStatic private external fun nativeStartWorker()
   @JvmStatic private external fun nativeEcho(value: String): String
-  @JvmStatic private external fun nativeWebViewEvent(kind: Int, handle: Long, payload: String)
+  @JvmStatic private external fun nativeWebViewEvent(kind: Int, handle: Long, payload: String, detail: String)
 }

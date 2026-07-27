@@ -1,15 +1,15 @@
-package dev.nanaloveyuki.ajni.demo
+package dev.nanaloveyuki.ajni.host
 
 import android.annotation.SuppressLint
 import android.graphics.Color
-import android.util.Log
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
-import android.webkit.WebResourceRequest
 import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -17,7 +17,7 @@ import android.widget.FrameLayout
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
-internal object AjniWebViewHost {
+object AjniWebViewHost {
   const val CREATE = 1
   const val NAVIGATE = 2
   const val LOAD_HTML = 3
@@ -55,7 +55,7 @@ internal object AjniWebViewHost {
     }
   }
 
-  fun command(command: Int, handle: Long, payload: String): Boolean {
+  fun command(command: Int, handle: Long, payload: String, requestId: String): Boolean {
     if (!attached.get()) return false
     return runOnMain {
       val host = container
@@ -68,7 +68,9 @@ internal object AjniWebViewHost {
           CREATE -> create(host, handle, payload)
           NAVIGATE -> requireView(handle).loadUrl(payload)
           LOAD_HTML -> requireView(handle).loadDataWithBaseURL(null, payload, "text/html", "utf-8", null)
-          EVAL -> requireView(handle).evaluateJavascript(payload) { emit(SCRIPT_RESULT, handle, it ?: "null") }
+          EVAL -> requireView(handle).evaluateJavascript(payload) {
+            emit(SCRIPT_RESULT, handle, it ?: "null", requestId)
+          }
           DESTROY -> destroy(handle)
           else -> emit(FAILED, handle, "Unsupported WebView command: $command")
         }
@@ -108,6 +110,7 @@ internal object AjniWebViewHost {
       settings.allowFileAccess = false
       settings.allowContentAccess = false
       settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+      settings.setSupportMultipleWindows(false)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) settings.safeBrowsingEnabled = true
       webViewClient = object : WebViewClient() {
         override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
@@ -118,11 +121,7 @@ internal object AjniWebViewHost {
           emit(NAVIGATION_FINISHED, handle, url.orEmpty())
         }
 
-        override fun onReceivedError(
-          view: WebView,
-          request: WebResourceRequest,
-          error: WebResourceError,
-        ) {
+        override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
           if (request.isForMainFrame) emit(FAILED, handle, error.description?.toString().orEmpty())
         }
       }
@@ -138,8 +137,7 @@ internal object AjniWebViewHost {
     if (initialUrl.isNotEmpty()) view.loadUrl(initialUrl)
   }
 
-  private fun requireView(handle: Long): WebView =
-    webViews[handle] ?: error("WebView handle does not exist")
+  private fun requireView(handle: Long): WebView = webViews[handle] ?: error("WebView handle does not exist")
 
   private fun destroy(handle: Long) {
     val view = webViews.remove(handle) ?: return emit(DESTROYED, handle, "")
@@ -160,7 +158,7 @@ internal object AjniWebViewHost {
       mainHandler.post(action)
     }
 
-  private fun emit(kind: Int, handle: Long, payload: String) {
-    NativeBridge.webViewEvent(kind, handle, payload)
+  private fun emit(kind: Int, handle: Long, payload: String, detail: String = "") {
+    NativeBridge.webViewEvent(kind, handle, payload, detail)
   }
 }
