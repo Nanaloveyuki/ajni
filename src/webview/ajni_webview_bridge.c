@@ -70,14 +70,10 @@ bool ajni_register_webview_natives(JNIEnv *env, jclass bridge_class) {
 MOONBIT_FFI_EXPORT int32_t ajni_webview_command(int32_t command, int64_t handle,
                                                  moonbit_bytes_t payload,
                                                  moonbit_bytes_t request_id) {
-  if (!g_initialized || g_vm == NULL || g_bridge_class == NULL || payload == NULL ||
-      request_id == NULL) return 0;
-  JNIEnv *env = NULL;
-  int attached = 0;
-  if ((*g_vm)->GetEnv(g_vm, (void **)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
-    if ((*g_vm)->AttachCurrentThread(g_vm, &env, NULL) != JNI_OK) return 0;
-    attached = 1;
-  }
+  if (payload == NULL || request_id == NULL) return 0;
+  AjniBridgeLease lease;
+  if (!ajni_bridge_lease_acquire(&lease)) return 0;
+  JNIEnv *env = lease.env;
   int32_t length = Moonbit_array_length(payload);
   jstring text = ajni_string_from_utf8(env, (const char *)payload, (size_t)length);
   int32_t request_length = Moonbit_array_length(request_id);
@@ -85,39 +81,35 @@ MOONBIT_FFI_EXPORT int32_t ajni_webview_command(int32_t command, int64_t handle,
   if (text == NULL || request == NULL || !ajni_check_exception(env, "NewString(WebView command)")) {
     if (text != NULL) (*env)->DeleteLocalRef(env, text);
     if (request != NULL) (*env)->DeleteLocalRef(env, request);
-    if (attached) (*g_vm)->DetachCurrentThread(g_vm);
+    ajni_bridge_lease_release(&lease);
     return 0;
   }
-  jmethodID method = (*env)->GetStaticMethodID(env, g_bridge_class, "webViewCommand",
+  jmethodID method = (*env)->GetStaticMethodID(env, lease.bridge_class, "webViewCommand",
                                                 "(IJLjava/lang/String;Ljava/lang/String;)Z");
   jboolean queued = JNI_FALSE;
   if (method != NULL) {
-    queued = (*env)->CallStaticBooleanMethod(env, g_bridge_class, method, command, (jlong)handle,
+    queued = (*env)->CallStaticBooleanMethod(env, lease.bridge_class, method, command, (jlong)handle,
                                               text, request);
   }
   int ok = method != NULL && queued == JNI_TRUE && ajni_check_exception(env, "NativeBridge.webViewCommand");
   (*env)->DeleteLocalRef(env, text);
   (*env)->DeleteLocalRef(env, request);
-  if (attached) (*g_vm)->DetachCurrentThread(g_vm);
+  ajni_bridge_lease_release(&lease);
   return ok ? 1 : 0;
 }
 
 MOONBIT_FFI_EXPORT int32_t ajni_webview_set_bounds(int64_t handle, int32_t x, int32_t y,
                                                     int32_t width, int32_t height) {
-  if (!g_initialized || g_vm == NULL || g_bridge_class == NULL) return 0;
-  JNIEnv *env = NULL;
-  int attached = 0;
-  if ((*g_vm)->GetEnv(g_vm, (void **)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
-    if ((*g_vm)->AttachCurrentThread(g_vm, &env, NULL) != JNI_OK) return 0;
-    attached = 1;
-  }
-  jmethodID method = (*env)->GetStaticMethodID(env, g_bridge_class, "webViewSetBounds", "(JIIII)Z");
+  AjniBridgeLease lease;
+  if (!ajni_bridge_lease_acquire(&lease)) return 0;
+  JNIEnv *env = lease.env;
+  jmethodID method = (*env)->GetStaticMethodID(env, lease.bridge_class, "webViewSetBounds", "(JIIII)Z");
   jboolean queued = JNI_FALSE;
   if (method != NULL) {
-    queued = (*env)->CallStaticBooleanMethod(env, g_bridge_class, method, (jlong)handle, x, y, width, height);
+    queued = (*env)->CallStaticBooleanMethod(env, lease.bridge_class, method, (jlong)handle, x, y, width, height);
   }
   int ok = method != NULL && queued == JNI_TRUE && ajni_check_exception(env, "NativeBridge.webViewSetBounds");
-  if (attached) (*g_vm)->DetachCurrentThread(g_vm);
+  ajni_bridge_lease_release(&lease);
   return ok ? 1 : 0;
 }
 

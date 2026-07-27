@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #if defined(AJNI_STANDALONE_JNI)
 #define MOONBIT_FFI_EXPORT
 typedef uint8_t *moonbit_bytes_t;
@@ -5,7 +7,6 @@ static void moonbit_decref(void *value) { (void)value; }
 #else
 #include <moonbit.h>
 #endif
-#include <stdint.h>
 
 typedef void (*ajni_event_callback)(void *, int32_t, int32_t, int32_t);
 
@@ -81,7 +82,10 @@ jclass g_bridge_class = NULL;
 static jobject g_class_loader = NULL;
 static ANativeWindow *g_window = NULL;
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_idle = PTHREAD_COND_INITIALIZER;
 bool g_initialized = false;
+static size_t g_active_workers = 0;
+static size_t g_active_bridge_calls = 0;
 #if defined(AJNI_USE_MOONBIT_EXPORTS)
 static bool g_moonbit_initialized = false;
 
@@ -134,6 +138,68 @@ static void ajni_release_window_locked(void) {
     ANativeWindow_release(g_window);
     g_window = NULL;
   }
+}
+
+bool ajni_bridge_lease_acquire(AjniBridgeLease *lease) {
+  memset(lease, 0, sizeof(*lease));
+  pthread_mutex_lock(&g_lock);
+  if (!g_initialized || g_vm == NULL || g_bridge_class == NULL) {
+    pthread_mutex_unlock(&g_lock);
+    return false;
+  }
+  lease->vm = g_vm;
+  ++g_active_bridge_calls;
+  pthread_mutex_unlock(&g_lock);
+
+  if ((*lease->vm)->GetEnv(lease->vm, (void **)&lease->env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+    if ((*lease->vm)->AttachCurrentThread(lease->vm, &lease->env, NULL) != JNI_OK || lease->env == NULL) {
+      pthread_mutex_lock(&g_lock);
+      --g_active_bridge_calls;
+      pthread_cond_broadcast(&g_idle);
+      pthread_mutex_unlock(&g_lock);
+      return false;
+    }
+    lease->attached = true;
+  }
+  if (lease->env == NULL) {
+    ajni_bridge_lease_release(lease);
+    return false;
+  }
+
+  pthread_mutex_lock(&g_lock);
+  lease->bridge_class = g_bridge_class == NULL ? NULL : (*lease->env)->NewLocalRef(lease->env, g_bridge_class);
+  pthread_mutex_unlock(&g_lock);
+  if (lease->bridge_class == NULL || !ajni_check_exception(lease->env, "NewLocalRef(NativeBridge)")) {
+    ajni_bridge_lease_release(lease);
+    return false;
+  }
+  return true;
+}
+
+void ajni_bridge_lease_release(AjniBridgeLease *lease) {
+  if (lease->bridge_class != NULL && lease->env != NULL) {
+    (*lease->env)->DeleteLocalRef(lease->env, lease->bridge_class);
+  }
+  if (lease->attached && lease->vm != NULL) {
+    (*lease->vm)->DetachCurrentThread(lease->vm);
+  }
+  if (lease->vm != NULL) {
+    pthread_mutex_lock(&g_lock);
+    --g_active_bridge_calls;
+    pthread_cond_broadcast(&g_idle);
+    pthread_mutex_unlock(&g_lock);
+  }
+  memset(lease, 0, sizeof(*lease));
+}
+
+static bool ajni_enqueue_ui_callback(AjniBridgeLease *lease, jint event_kind) {
+  jmethodID post = (*lease->env)->GetStaticMethodID(lease->env, lease->bridge_class, "postUiCallback", "(I)Z");
+  if (post == NULL) {
+    ajni_check_exception(lease->env, "NativeBridge.postUiCallback");
+    return false;
+  }
+  jboolean queued = (*lease->env)->CallStaticBooleanMethod(lease->env, lease->bridge_class, post, event_kind);
+  return queued == JNI_TRUE && ajni_check_exception(lease->env, "NativeBridge.postUiCallback");
 }
 
 static void ajni_draw_window_locked(uint32_t color) {
@@ -283,16 +349,18 @@ static void ajni_native_initialize(JNIEnv *env, jclass unused, jobject context) 
     if (context_class != NULL) (*env)->DeleteLocalRef(env, context_class);
     return;
   }
+  bool initialized;
   pthread_mutex_lock(&g_lock);
   if (g_class_loader != NULL) {
     (*env)->DeleteGlobalRef(env, g_class_loader);
   }
   g_class_loader = loader == NULL ? NULL : (*env)->NewGlobalRef(env, loader);
   g_initialized = g_class_loader != NULL;
+  initialized = g_initialized;
   pthread_mutex_unlock(&g_lock);
   if (loader != NULL) (*env)->DeleteLocalRef(env, loader);
   if (context_class != NULL) (*env)->DeleteLocalRef(env, context_class);
-  if (!g_initialized) {
+  if (!initialized) {
     (*env)->ThrowNew(env, "java/lang/IllegalStateException", "could not retain application ClassLoader");
   }
 }
@@ -353,66 +421,80 @@ static void ajni_native_surface_destroyed(JNIEnv *env, jclass unused) {
   ajni_emit(AJNI_SURFACE_DESTROYED, 0, 0);
 }
 
-static void ajni_native_on_ui_task(JNIEnv *env, jclass unused) {
+static void ajni_native_on_ui_task(JNIEnv *env, jclass unused, jint event_kind) {
   (void)env;
   (void)unused;
+  pthread_mutex_lock(&g_lock);
+  bool initialized = g_initialized;
+  pthread_mutex_unlock(&g_lock);
+  if (!initialized) return;
   AJNI_LOGI("UI callback dispatched on Android main thread");
+  if (event_kind == AJNI_WORKER_ATTACHED) ajni_emit(AJNI_WORKER_ATTACHED, 0, 0);
   ajni_emit(AJNI_UI_TASK, 0, 0);
 }
 
 static void *ajni_worker_main(void *unused) {
   (void)unused;
-  JNIEnv *env = NULL;
-  if ((*g_vm)->AttachCurrentThread(g_vm, &env, NULL) != JNI_OK || env == NULL) return NULL;
-  AJNI_LOGI("native worker attached to JavaVM");
-  ajni_emit(AJNI_WORKER_ATTACHED, 0, 0);
-  jmethodID post = (*env)->GetStaticMethodID(env, g_bridge_class, "postUiCallback", "()V");
-  if (post != NULL) {
-    (*env)->CallStaticVoidMethod(env, g_bridge_class, post);
-    ajni_check_exception(env, "NativeBridge.postUiCallback");
-    AJNI_LOGI("native worker posted UI callback");
+  AjniBridgeLease lease;
+  if (ajni_bridge_lease_acquire(&lease)) {
+    AJNI_LOGI("native worker attached to JavaVM");
+    if (ajni_enqueue_ui_callback(&lease, AJNI_WORKER_ATTACHED)) {
+      AJNI_LOGI("native worker posted UI callback");
+    }
+    ajni_bridge_lease_release(&lease);
   }
-  (*g_vm)->DetachCurrentThread(g_vm);
+  pthread_mutex_lock(&g_lock);
+  --g_active_workers;
+  pthread_cond_broadcast(&g_idle);
+  pthread_mutex_unlock(&g_lock);
   return NULL;
 }
 
-static void ajni_native_start_worker(JNIEnv *env, jclass unused) {
-  (void)env;
-  (void)unused;
+static bool ajni_start_worker_locked(void) {
+  if (!g_initialized || g_vm == NULL || g_bridge_class == NULL) return false;
+  ++g_active_workers;
   pthread_t thread;
   if (pthread_create(&thread, NULL, ajni_worker_main, NULL) == 0) {
     pthread_detach(thread);
-  } else {
-    (*env)->ThrowNew(env, "java/lang/IllegalStateException", "could not start native worker");
+    return true;
   }
+  --g_active_workers;
+  return false;
 }
 
-MOONBIT_FFI_EXPORT int32_t ajni_runtime_ready(void) { return g_initialized ? 1 : 0; }
+static void ajni_native_start_worker(JNIEnv *env, jclass unused) {
+  (void)unused;
+  pthread_mutex_lock(&g_lock);
+  bool started = ajni_start_worker_locked();
+  pthread_mutex_unlock(&g_lock);
+  if (!started) (*env)->ThrowNew(env, "java/lang/IllegalStateException", "could not start native worker");
+}
+
+MOONBIT_FFI_EXPORT int32_t ajni_runtime_ready(void) {
+  pthread_mutex_lock(&g_lock);
+  int32_t ready = g_initialized ? 1 : 0;
+  pthread_mutex_unlock(&g_lock);
+  return ready;
+}
 MOONBIT_FFI_EXPORT int32_t ajni_post_ui_callback(void) {
-  if (!g_initialized || g_vm == NULL || g_bridge_class == NULL) return 0;
-  JNIEnv *env = NULL;
-  int attached = 0;
-  if ((*g_vm)->GetEnv(g_vm, (void **)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
-    if ((*g_vm)->AttachCurrentThread(g_vm, &env, NULL) != JNI_OK) return 0;
-    attached = 1;
-  }
-  jmethodID post = (*env)->GetStaticMethodID(env, g_bridge_class, "postUiCallback", "()V");
-  if (post != NULL) (*env)->CallStaticVoidMethod(env, g_bridge_class, post);
-  int ok = post != NULL && ajni_check_exception(env, "NativeBridge.postUiCallback");
-  if (attached) (*g_vm)->DetachCurrentThread(g_vm);
+  AjniBridgeLease lease;
+  if (!ajni_bridge_lease_acquire(&lease)) return 0;
+  int ok = ajni_enqueue_ui_callback(&lease, AJNI_UI_TASK);
+  ajni_bridge_lease_release(&lease);
   return ok ? 1 : 0;
 }
 MOONBIT_FFI_EXPORT int32_t ajni_start_worker(void) {
-  if (!g_initialized) return 0;
-  pthread_t thread;
-  if (pthread_create(&thread, NULL, ajni_worker_main, NULL) != 0) return 0;
-  pthread_detach(thread);
-  return 1;
+  pthread_mutex_lock(&g_lock);
+  int32_t started = ajni_start_worker_locked() ? 1 : 0;
+  pthread_mutex_unlock(&g_lock);
+  return started;
 }
 
 JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *unused) {
   (void)unused;
+  pthread_mutex_lock(&g_lock);
   g_vm = vm;
+  pthread_mutex_unlock(&g_lock);
   JNIEnv *env = NULL;
   if ((*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_6) != JNI_OK) return JNI_ERR;
 #if defined(AJNI_USE_MOONBIT_EXPORTS)
@@ -427,7 +509,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *unused) {
       {"nativeSurfaceCreated", "(Landroid/view/Surface;II)V", (void *)ajni_native_surface_created},
       {"nativeSurfaceChanged", "(II)V", (void *)ajni_native_surface_changed},
       {"nativeSurfaceDestroyed", "()V", (void *)ajni_native_surface_destroyed},
-      {"nativeOnUiTask", "()V", (void *)ajni_native_on_ui_task},
+      {"nativeOnUiTask", "(I)V", (void *)ajni_native_on_ui_task},
       {"nativeStartWorker", "()V", (void *)ajni_native_start_worker},
       {"nativeEcho", "(Ljava/lang/String;)Ljava/lang/String;", (void *)ajni_native_echo},
   };
@@ -442,9 +524,13 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *unused) {
     return JNI_ERR;
   }
 #endif
-  g_bridge_class = (jclass)(*env)->NewGlobalRef(env, local_class);
+  jclass bridge_class = (jclass)(*env)->NewGlobalRef(env, local_class);
   (*env)->DeleteLocalRef(env, local_class);
-  return g_bridge_class == NULL ? JNI_ERR : JNI_VERSION_1_6;
+  if (bridge_class == NULL) return JNI_ERR;
+  pthread_mutex_lock(&g_lock);
+  g_bridge_class = bridge_class;
+  pthread_mutex_unlock(&g_lock);
+  return JNI_VERSION_1_6;
 }
 
 JNIEXPORT void JNI_OnUnload(JavaVM *vm, void *unused) {
@@ -452,16 +538,18 @@ JNIEXPORT void JNI_OnUnload(JavaVM *vm, void *unused) {
   JNIEnv *env = NULL;
   if ((*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_6) != JNI_OK) return;
   ajni_native_shutdown(env, NULL);
-  if (g_bridge_class != NULL) {
-    (*env)->DeleteGlobalRef(env, g_bridge_class);
-    g_bridge_class = NULL;
-  }
+  pthread_mutex_lock(&g_lock);
+  while (g_active_workers != 0 || g_active_bridge_calls != 0) pthread_cond_wait(&g_idle, &g_lock);
+  jclass bridge_class = g_bridge_class;
+  g_bridge_class = NULL;
+  g_vm = NULL;
+  pthread_mutex_unlock(&g_lock);
+  if (bridge_class != NULL) (*env)->DeleteGlobalRef(env, bridge_class);
   if (g_event_context != NULL) {
     moonbit_decref(g_event_context);
     g_event_context = NULL;
   }
   g_event_callback = NULL;
-  g_vm = NULL;
 }
 
 #else
