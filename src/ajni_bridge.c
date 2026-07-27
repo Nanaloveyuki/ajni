@@ -239,6 +239,10 @@ static void ajni_draw_window_locked(uint32_t color) {
 }
 
 jstring ajni_string_from_utf8(JNIEnv *env, const char *text, size_t length) {
+  if (env == NULL || (text == NULL && length != 0) || length > INT32_MAX ||
+      length > (SIZE_MAX / sizeof(jchar)) - 1) {
+    return NULL;
+  }
   jchar *utf16 = (jchar *)calloc(length + 1, sizeof(jchar));
   if (utf16 == NULL) {
     return NULL;
@@ -279,11 +283,18 @@ jstring ajni_string_from_utf8(JNIEnv *env, const char *text, size_t length) {
 }
 
 char *ajni_utf8_from_string(JNIEnv *env, jstring text, size_t *out_length) {
+  if (env == NULL || text == NULL || out_length == NULL) {
+    return NULL;
+  }
+  *out_length = 0;
+  jsize length = (*env)->GetStringLength(env, text);
+  if (length < 0 || (size_t)length > (SIZE_MAX - 1) / 3) {
+    return NULL;
+  }
   const jchar *chars = (*env)->GetStringChars(env, text, NULL);
   if (chars == NULL || !ajni_check_exception(env, "GetStringChars")) {
     return NULL;
   }
-  jsize length = (*env)->GetStringLength(env, text);
   char *output = (char *)malloc((size_t)length * 3 + 1);
   if (output == NULL) {
     (*env)->ReleaseStringChars(env, text, chars);

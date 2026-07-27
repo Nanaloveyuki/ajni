@@ -10,6 +10,7 @@ typedef uint8_t *moonbit_bytes_t;
 #if defined(__ANDROID__)
 
 #include <jni.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -25,6 +26,10 @@ static moonbit_bytes_t ajni_bytes_from_string(JNIEnv *env, jstring text) {
   size_t length = 0;
   char *utf8 = text == NULL ? NULL : ajni_utf8_from_string(env, text, &length);
   if (text != NULL && utf8 == NULL) return NULL;
+  if (length > INT32_MAX) {
+    free(utf8);
+    return NULL;
+  }
   moonbit_bytes_t bytes = moonbit_make_bytes((int32_t)length, 0);
   if (bytes != NULL && length > 0) memcpy(bytes, utf8, length);
   free(utf8);
