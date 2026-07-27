@@ -96,6 +96,15 @@ object NativeBridge {
     if (initialized.get()) nativeWebViewEvent(kind, handle, payload, detail)
   }
 
+  /** Posts a WebView event from a WebKit worker thread without entering JNI there. */
+  @JvmStatic
+  fun postWebViewEvent(kind: Int, handle: Long, payload: String, detail: String = ""): Boolean {
+    if (!initialized.get()) return false
+    return mainHandler.post {
+      if (initialized.get()) nativeWebViewEvent(kind, handle, payload, detail)
+    }
+  }
+
   private fun requireMainThread(operation: String) {
     check(Looper.myLooper() == Looper.getMainLooper()) { "NativeBridge.$operation must run on the main thread" }
   }

@@ -7,9 +7,11 @@ import {
 }
 
 // Values
-pub fn create(Int64, String) -> Unit raise @ajni.JniError
+pub fn add_document_start_script(Int64, String, operation_id? : String) -> Unit raise @ajni.JniError
 
-pub fn destroy(Int64) -> Unit raise @ajni.JniError
+pub fn create(Int64, String, InitialContent, document_start_scripts? : Array[String], resource_limits? : WebViewResourceLimits, operation_id? : String) -> Unit raise @ajni.JniError
+
+pub fn destroy(Int64, operation_id? : String) -> Unit raise @ajni.JniError
 
 pub fn dispatch_from_android(Int, Int64, Bytes, Bytes) -> Unit
 
@@ -17,17 +19,41 @@ pub fn eval(Int64, String, String) -> Unit raise @ajni.JniError
 
 pub fn install_event_handler((Event) -> Unit) -> Int
 
-pub fn load_html(Int64, String) -> Unit raise @ajni.JniError
+pub fn load_html_with_base_url(Int64, String, String, operation_id? : String) -> Unit raise @ajni.JniError
 
-pub fn navigate(Int64, String) -> Unit raise @ajni.JniError
+pub fn navigate(Int64, String, operation_id? : String) -> Unit raise @ajni.JniError
+
+pub fn post_message(Int64, String, operation_id? : String) -> Unit raise @ajni.JniError
 
 pub fn remove_event_handler(Int) -> Unit
+
+pub fn respond_asset(Int64, String, AssetResponse, operation_id? : String) -> Unit raise @ajni.JniError
 
 pub fn set_bounds(Int64, Int, Int, Int, Int) -> Unit raise @ajni.JniError
 
 // Errors
 
 // Types and methods
+pub struct AssetHeader {
+  name : String
+  value : String
+} derive(Eq, @debug.Debug)
+pub fn AssetHeader::new(name~ : String, value~ : String) -> Self
+
+pub struct AssetRequest {
+  id : String
+  path : String
+} derive(Eq, @debug.Debug)
+
+pub struct AssetResponse {
+  status : Int
+  mime_type : String
+  encoding : String
+  headers : Array[AssetHeader]
+  body : Bytes
+} derive(Eq, @debug.Debug)
+pub fn AssetResponse::new(status~ : Int, mime_type~ : String, encoding? : String, headers? : Array[AssetHeader], body? : Bytes) -> Self
+
 pub struct Event {
   handle : Int64
   kind : EventKind
@@ -40,9 +66,27 @@ pub(all) enum EventKind {
   TitleChanged(String)
   ScriptResult(String, String)
   Failed(String)
+  PageMessage(String, String, Bool)
+  AssetRequest(AssetRequest)
+  OperationFailed(String, String)
   Destroyed
 } derive(Eq, @debug.Debug)
+
+pub(all) enum InitialContent {
+  Empty
+  Url(String)
+  Html(String, String)
+} derive(Eq, @debug.Debug)
+
+pub struct WebViewResourceLimits {
+  max_page_message_bytes : Int
+  max_pending_asset_requests : Int
+  max_asset_response_bytes : Int
+  asset_response_timeout_millis : Int
+} derive(Eq, @debug.Debug)
+pub fn WebViewResourceLimits::new(max_page_message_bytes? : Int, max_pending_asset_requests? : Int, max_asset_response_bytes? : Int, asset_response_timeout_millis? : Int) -> Self
 
 // Type aliases
 
 // Traits
+
