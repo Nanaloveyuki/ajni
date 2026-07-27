@@ -9,13 +9,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: moonbitlang/setup-moonbit@v0
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
       - run: moon check --target native
       - run: moon test --target native
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android native build tools
+        run: sdkmanager "build-tools;36.1.0" "cmake;4.1.2" "ndk;29.0.14206865"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
