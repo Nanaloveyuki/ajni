@@ -2,19 +2,45 @@ name: Build
 
 on:
   push:
+    branches:
+      - main
   pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Install MoonBit
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
-      - run: moon check --target native
-      - run: moon test --target native
+      - name: Show tool versions
+        run: moon version --all
+      - name: Update MoonBit registry
+        run: moon update
+      - name: Install MoonBit dependencies
+        run: moon install
+      - name: Check formatting and exported interfaces
+        run: |
+          moon fmt --check
+          moon info --target native
+          git diff --exit-code --ignore-blank-lines
+      - name: Check and test native runtime
+        run: |
+          moon check --target native
+          moon test --target native
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -27,5 +53,5 @@ jobs:
           gradle-version: '8.10.2'
       - run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/29.0.14206865"
-          gradle assembleDebug
+          gradle assembleDebug --no-daemon --stacktrace
         working-directory: android
