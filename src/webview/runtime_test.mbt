@@ -35,3 +35,5 @@ test "script results preserve their request identifier" {
   }
   remove_event_handler(id)
 }
+
+///|

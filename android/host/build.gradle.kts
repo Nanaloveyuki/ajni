@@ -6,6 +6,7 @@ plugins {
 android {
   namespace = "dev.nanaloveyuki.ajni.host"
   compileSdk = 35
+  buildToolsVersion = "36.1.0"
 
   defaultConfig {
     minSdk = 24
@@ -21,4 +22,8 @@ kotlin {
   compilerOptions {
     jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
   }
+}
+
+dependencies {
+  api("androidx.webkit:webkit:1.12.1")
 }

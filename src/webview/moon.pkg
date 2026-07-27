@@ -1,5 +1,6 @@
 import {
   "Nanaloveyuki/ajni",
+  "moonbitlang/core/encoding/base64",
 }
 
 options(

@@ -85,13 +85,23 @@ let subscription = @webview.install_event_handler(event => match event.kind {
   @webview.EventKind::Created(_) => println("ready")
   @webview.EventKind::ScriptResult(request_id, json) =>
     println("\{request_id}: \{json}")
-  @webview.EventKind::Failed(message) => println(message)
+  @webview.EventKind::PageMessage(body, origin, _is_main_frame) =>
+    println("\{origin}: \{body}")
+  @webview.EventKind::AssetRequest(request) => println(request.path)
+  @webview.EventKind::OperationFailed(operation_id, message) =>
+    println("\{operation_id}: \{message}")
   _ => ()
 })
 
-try! @webview.create(1L, "https://example.com")
+try! @webview.create(
+  1L,
+  "https://app.example.test",
+  @webview.InitialContent::Url("https://app.example.test/assets/index.html"),
+  document_start_scripts=["globalThis.appReady = true"],
+  operation_id="create-browser",
+)
 try! @webview.eval(1L, "document.title", "title-request")
-try! @webview.destroy(1L)
+try! @webview.destroy(1L, operation_id="destroy-browser")
 @webview.remove_event_handler(subscription)
 ```
 
@@ -102,7 +112,10 @@ CMake template demonstrates all three requirements.
 
 The host enables JavaScript for `eval`, disables file and content access,
 disables mixed content and multiple windows, enables Safe Browsing on Android
-8+, and does not expose `addJavascriptInterface`.
+8+, and does not expose `addJavascriptInterface`. Web messages are delivered
+only through AndroidX WebKit's trusted-origin listener. Embedded resources use
+the same origin's `/assets/` path and emit `AssetRequest`; complete them with
+`respond_asset` before the configured timeout.
 
 ## Build And Verify
 
@@ -115,11 +128,14 @@ moon test --target native -v
 ```
 
 For an Android build, install Android SDK platform tools, NDK `29.0.14206865`,
-CMake, Java 17, Gradle 8.10.2, and MoonBit. Then run:
+CMake, Java 17, Gradle, and MoonBit. The bundled demo can run its emulator
+tests with:
 
 ```powershell
+$env:ANDROID_SDK_ROOT = "C:\path\to\Android\Sdk"
 $env:ANDROID_NDK_HOME = "C:\path\to\android-ndk-r29"
-.\scripts\build-android.ps1
+$env:ANDROID_SERIAL = "emulator-5554"
+gradle -p android :app:connectedDebugAndroidTest
 ```
 
 The GitHub workflow builds the Android demo for both configured ABIs. Device
