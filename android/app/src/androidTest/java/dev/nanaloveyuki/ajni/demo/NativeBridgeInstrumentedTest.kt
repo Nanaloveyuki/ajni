@@ -3,6 +3,8 @@ package dev.nanaloveyuki.ajni.demo
 import android.widget.FrameLayout
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.nanaloveyuki.ajni.host.AjniWebViewHost
+import dev.nanaloveyuki.ajni.host.NativeBridge
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,12 +26,12 @@ class NativeBridgeInstrumentedTest {
       NativeBridge.initialize(ApplicationProvider.getApplicationContext())
       host = FrameLayout(ApplicationProvider.getApplicationContext())
       NativeBridge.attachWebViewContainer(host)
-      assertTrue(NativeBridge.webViewCommand(AjniWebViewHost.CREATE, 7L, ""))
+      assertTrue(NativeBridge.webViewCommand(AjniWebViewHost.CREATE, 7L, "", ""))
     }
     instrumentation.waitForIdleSync()
     instrumentation.runOnMainSync {
       assertEquals(1, host.childCount)
-      assertTrue(NativeBridge.webViewCommand(AjniWebViewHost.DESTROY, 7L, ""))
+      assertTrue(NativeBridge.webViewCommand(AjniWebViewHost.DESTROY, 7L, "", ""))
     }
     instrumentation.waitForIdleSync()
     instrumentation.runOnMainSync {

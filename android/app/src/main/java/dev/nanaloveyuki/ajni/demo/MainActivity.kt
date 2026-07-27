@@ -12,6 +12,7 @@ import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import dev.nanaloveyuki.ajni.host.NativeBridge
 
 class MainActivity : ComponentActivity(), SurfaceHolder.Callback {
   private lateinit var status: TextView

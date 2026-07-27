@@ -1,0 +1,48 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Nanaloveyuki/ajni/webview"
+
+import {
+  "Nanaloveyuki/ajni",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn create(Int64, String) -> Unit raise @ajni.JniError
+
+pub fn destroy(Int64) -> Unit raise @ajni.JniError
+
+pub fn dispatch_from_android(Int, Int64, Bytes, Bytes) -> Unit
+
+pub fn eval(Int64, String, String) -> Unit raise @ajni.JniError
+
+pub fn install_event_handler((Event) -> Unit) -> Int
+
+pub fn load_html(Int64, String) -> Unit raise @ajni.JniError
+
+pub fn navigate(Int64, String) -> Unit raise @ajni.JniError
+
+pub fn remove_event_handler(Int) -> Unit
+
+pub fn set_bounds(Int64, Int, Int, Int, Int) -> Unit raise @ajni.JniError
+
+// Errors
+
+// Types and methods
+pub struct Event {
+  handle : Int64
+  kind : EventKind
+} derive(Eq, @debug.Debug)
+
+pub(all) enum EventKind {
+  Created(String)
+  NavigationStarted(String)
+  NavigationFinished(String)
+  TitleChanged(String)
+  ScriptResult(String, String)
+  Failed(String)
+  Destroyed
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

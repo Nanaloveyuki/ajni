@@ -8,9 +8,11 @@ from a native worker thread to Android's UI thread.
 
 ## Layout
 
-- `src/`: MoonBit event contract, safe runtime facade, native FFI declarations,
-  and the JNI/ANativeWindow bridge.
-- `android/`: `dev.nanaloveyuki.ajni.demo`, a Kotlin Activity that exercises the
+- `src/`: core MoonBit lifecycle/runtime facade, native FFI declarations, and
+  the JNI/ANativeWindow bridge. `src/webview/` is an opt-in WebView package
+  with its own MoonBit event contract and native stub.
+- `android/host`: reusable `dev.nanaloveyuki.ajni.host` Kotlin bridge expected
+  by the JNI library; `android/app` is a demo consumer that exercises the
   lifecycle, Surface, native worker, and UTF-8 string paths.
 - `scripts/build-android.ps1`: validates SDK/NDK availability before invoking
   Gradle.
@@ -18,7 +20,8 @@ from a native worker thread to Android's UI thread.
 `src/android_runtime` is the MoonBit native host package. Android CMake runs
 MoonBit to generate it, compiles the generated source plus MoonBit's runtime
 with the NDK, and defines `AJNI_USE_MOONBIT_EXPORTS`. Its stable C export is
-`ajni_dispatch_event`; WebView callbacks use
+`ajni_dispatch_event`. Android builds that opt in to `ajni/webview` also link
+`src/webview/ajni_webview_bridge.c` and export
 `ajni_dispatch_webview_event`. Java callbacks therefore enter MoonBit without
 depending on MoonBit's generated symbol names.
 
@@ -59,25 +62,34 @@ post a callback through `Handler(Looper.getMainLooper())`.
 
 ## WebView Host
 
-`ajni` provides an Android-only host contract for a later UI abstraction to
-use. The application must attach a caller-owned `FrameLayout` on the Android
-main thread before any WebView command:
+`Nanaloveyuki/ajni/webview` provides an Android-only host contract for a later
+UI abstraction to use. Importing `Nanaloveyuki/ajni` alone does not compile the
+WebView facade or its MoonBit native stub. The Android executable must import
+the feature package, export `dispatch_from_android` as
+`ajni_dispatch_webview_event`, and compile `src/webview/ajni_webview_bridge.c`.
+The included demo's `src/android_runtime` and CMake do this already.
+
+The application must attach a caller-owned `FrameLayout` on the Android main
+thread before any WebView command:
 
 ```kotlin
+import dev.nanaloveyuki.ajni.host.NativeBridge
+
 NativeBridge.attachWebViewContainer(container)
 ```
 
-The MoonBit facade marshals `webview_create`, `webview_navigate`,
-`webview_load_html`, `webview_eval`, `webview_set_bounds`, and
-`webview_destroy` to that UI thread when called from another thread. A
+The feature facade marshals `@webview.create`, `@webview.navigate`,
+`@webview.load_html`, `@webview.eval`, `@webview.set_bounds`, and
+`@webview.destroy` to that UI thread when called from another thread. A
 `WebView` is keyed by an `Int64` handle and is removed and destroyed
 automatically when the container detaches.
 
-`AndroidEvent::WebView` carries the handle plus `Created`, navigation, title,
-script-result, failure, and destroyed events. Their string payloads are
-converted from Java UTF-16 to UTF-8 in JNI and lossily decoded at the MoonBit
-boundary. The host enables JavaScript for `eval`, disables file/content access
-and mixed content, and does not register `addJavascriptInterface`.
+`@webview.Event` carries the handle plus `EventKind::{Created, NavigationStarted,
+NavigationFinished, TitleChanged, ScriptResult, Failed, Destroyed}`. Their
+string payloads are converted from Java UTF-16 to UTF-8 in JNI and lossily
+decoded at the MoonBit boundary. The host enables JavaScript for `eval`,
+disables file/content access and mixed content, and does not register
+`addJavascriptInterface`.
 
 ## Lifetime rules
 

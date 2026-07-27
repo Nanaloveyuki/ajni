@@ -1,5 +1,6 @@
 import {
   "Nanaloveyuki/ajni",
+  "Nanaloveyuki/ajni/webview",
 }
 
 pkgtype(kind: "executable")
