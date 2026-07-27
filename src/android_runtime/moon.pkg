@@ -5,5 +5,12 @@ import {
 pkgtype(kind: "executable")
 
 options(
-  link: { "native": { "exports": [ "dispatch:ajni_dispatch_event" ] } },
+  link: {
+    "native": {
+      "exports": [
+        "dispatch:ajni_dispatch_event",
+        "dispatch_webview:ajni_dispatch_webview_event",
+      ],
+    },
+  },
 )

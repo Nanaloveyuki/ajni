@@ -10,6 +10,8 @@ pub fn decode_utf8(BytesView) -> String
 
 pub fn dispatch_from_android(Int, Int, Int) -> Unit
 
+pub fn dispatch_webview_from_android(Int, Int64, Bytes) -> Unit
+
 pub fn emit_for_test(Int, Int, Int) -> Unit
 
 pub fn encode_utf8(String) -> Bytes
@@ -23,6 +25,18 @@ pub fn remove_event_handler(Int) -> Unit
 pub fn runtime_ready() -> Bool
 
 pub fn start_worker() -> Unit raise JniError
+
+pub fn webview_create(Int64, String) -> Unit raise JniError
+
+pub fn webview_destroy(Int64) -> Unit raise JniError
+
+pub fn webview_eval(Int64, String) -> Unit raise JniError
+
+pub fn webview_load_html(Int64, String) -> Unit raise JniError
+
+pub fn webview_navigate(Int64, String) -> Unit raise JniError
+
+pub fn webview_set_bounds(Int64, Int, Int, Int, Int) -> Unit raise JniError
 
 // Errors
 pub(all) suberror JniError {
@@ -40,6 +54,7 @@ pub(all) enum AndroidEvent {
   SurfaceDestroyed
   WorkerAttached
   UiTask
+  WebView(Int64, WebViewEvent)
 } derive(Eq, @debug.Debug)
 
 pub struct GlobalRef {
@@ -61,6 +76,16 @@ pub struct LocalFrame {
   // private fields
 } derive(Eq, @debug.Debug)
 pub fn LocalFrame::new(capacity? : Int) -> Self
+
+pub(all) enum WebViewEvent {
+  Created(String)
+  NavigationStarted(String)
+  NavigationFinished(String)
+  TitleChanged(String)
+  ScriptResult(String)
+  Failed(String)
+  Destroyed
+} derive(Eq, @debug.Debug)
 
 // Type aliases
 

@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.view.Surface
+import android.widget.FrameLayout
 import java.util.concurrent.atomic.AtomicBoolean
 
 internal object NativeBridge {
@@ -49,9 +50,30 @@ internal object NativeBridge {
 
   fun echo(value: String): String = nativeEcho(value)
 
+  fun attachWebViewContainer(container: FrameLayout) {
+    AjniWebViewHost.attach(container)
+  }
+
+  fun detachWebViewContainer(container: FrameLayout) {
+    AjniWebViewHost.detach(container)
+  }
+
   @JvmStatic
   fun postUiCallback() {
     mainHandler.post { nativeOnUiTask() }
+  }
+
+  @JvmStatic
+  fun webViewCommand(command: Int, handle: Long, payload: String): Boolean =
+    AjniWebViewHost.command(command, handle, payload)
+
+  @JvmStatic
+  fun webViewSetBounds(handle: Long, x: Int, y: Int, width: Int, height: Int): Boolean =
+    AjniWebViewHost.setBounds(handle, x, y, width, height)
+
+  @JvmStatic
+  fun webViewEvent(kind: Int, handle: Long, payload: String) {
+    if (initialized.get()) nativeWebViewEvent(kind, handle, payload)
   }
 
   @JvmStatic private external fun nativeInitialize(context: Context)
@@ -63,4 +85,5 @@ internal object NativeBridge {
   @JvmStatic private external fun nativeOnUiTask()
   @JvmStatic private external fun nativeStartWorker()
   @JvmStatic private external fun nativeEcho(value: String): String
+  @JvmStatic private external fun nativeWebViewEvent(kind: Int, handle: Long, payload: String)
 }

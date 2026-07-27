@@ -4,6 +4,8 @@ package "Nanaloveyuki/ajni/android_runtime"
 // Values
 pub fn dispatch(Int, Int, Int) -> Unit
 
+pub fn dispatch_webview(Int, Int64, Bytes) -> Unit
+
 // Errors
 
 // Types and methods
