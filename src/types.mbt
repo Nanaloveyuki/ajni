@@ -10,9 +10,9 @@ pub(all) enum Lifecycle {
 } derive(Eq, Debug)
 
 ///|
-/// Events delivered from the Android bridge. Surface events are always emitted
-/// on the Android UI thread; worker events are emitted by an attached native
-/// thread or by the UI task it schedules.
+/// Events delivered from the Android bridge. Every event handler runs on the
+/// Android main Looper; worker-originated events are first posted there by the
+/// JNI bridge.
 pub(all) enum AndroidEvent {
   Lifecycle(Lifecycle)
   SurfaceCreated(Int, Int)

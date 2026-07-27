@@ -48,7 +48,8 @@ pub fn post_to_ui() -> Unit raise JniError {
 
 ///|
 /// Starts a native-owned worker thread. The bridge attaches it to the VM,
-/// reports `WorkerAttached`, posts to the UI thread, then detaches it.
+/// then posts `WorkerAttached` and `UiTask` to the Android main Looper before
+/// detaching it.
 pub fn start_worker() -> Unit raise JniError {
   if native_start_worker() == 0 {
     raise NotInitialized
