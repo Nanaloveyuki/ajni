@@ -1,2 +1,14 @@
 # ref
 ref/
+_build/
+.moon/
+android/.gradle/
+android/.kotlin/
+android/local.properties
+android/**/build/
+android/**/.cxx/
+android/.idea/
+
+# editor
+.idea/
+*.iml

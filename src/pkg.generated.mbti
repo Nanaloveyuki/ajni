@@ -1,0 +1,68 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Nanaloveyuki/ajni"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn decode_utf8(BytesView) -> String
+
+pub fn dispatch_from_android(Int, Int, Int) -> Unit
+
+pub fn emit_for_test(Int, Int, Int) -> Unit
+
+pub fn encode_utf8(String) -> Bytes
+
+pub fn install_event_handler((AndroidEvent) -> Unit) -> Int
+
+pub fn post_to_ui() -> Unit raise JniError
+
+pub fn remove_event_handler(Int) -> Unit
+
+pub fn runtime_ready() -> Bool
+
+pub fn start_worker() -> Unit raise JniError
+
+// Errors
+pub(all) suberror JniError {
+  NotInitialized
+  RuntimeDestroyed
+  NativeFailure(String)
+  JavaException(String)
+} derive(@debug.Debug)
+
+// Types and methods
+pub(all) enum AndroidEvent {
+  Lifecycle(Lifecycle)
+  SurfaceCreated(Int, Int)
+  SurfaceChanged(Int, Int)
+  SurfaceDestroyed
+  WorkerAttached
+  UiTask
+} derive(Eq, @debug.Debug)
+
+pub struct GlobalRef {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn GlobalRef::from_raw_for_bridge(UInt64) -> Self
+pub fn GlobalRef::is_null(Self) -> Bool
+
+pub(all) enum Lifecycle {
+  Created
+  Started
+  Resumed
+  Paused
+  Stopped
+  Destroyed
+} derive(Eq, @debug.Debug)
+
+pub struct LocalFrame {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn LocalFrame::new(capacity? : Int) -> Self
+
+// Type aliases
+
+// Traits
+
