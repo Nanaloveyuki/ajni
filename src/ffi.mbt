@@ -23,3 +23,20 @@ extern "C" fn native_emit_for_test(
   first : Int,
   second : Int,
 ) -> Unit = "ajni_emit_for_test"
+
+///|
+#borrow(payload)
+extern "C" fn native_webview_command(
+  command : Int,
+  handle : Int64,
+  payload : Bytes,
+) -> Int = "ajni_webview_command"
+
+///|
+extern "C" fn native_webview_set_bounds(
+  handle : Int64,
+  x : Int,
+  y : Int,
+  width : Int,
+  height : Int,
+) -> Int = "ajni_webview_set_bounds"

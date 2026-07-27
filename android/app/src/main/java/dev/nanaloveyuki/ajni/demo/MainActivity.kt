@@ -6,6 +6,7 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
@@ -15,6 +16,7 @@ import androidx.lifecycle.LifecycleOwner
 class MainActivity : ComponentActivity(), SurfaceHolder.Callback {
   private lateinit var status: TextView
   private lateinit var surface: SurfaceView
+  private lateinit var webViewContainer: FrameLayout
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -34,13 +36,17 @@ class MainActivity : ComponentActivity(), SurfaceHolder.Callback {
         status.text = "Native worker attached and UI callback posted"
       }
     }
+    webViewContainer = FrameLayout(this).apply {
+      addView(surface, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    }
     val root = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
       addView(status, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-      addView(surface, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+      addView(webViewContainer, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
       addView(worker, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
     }
     setContentView(root)
+    NativeBridge.attachWebViewContainer(webViewContainer)
     lifecycle.addObserver(object : DefaultLifecycleObserver {
       override fun onCreate(owner: LifecycleOwner) = forward(1, "created")
       override fun onStart(owner: LifecycleOwner) = forward(2, "started")
@@ -73,6 +79,7 @@ class MainActivity : ComponentActivity(), SurfaceHolder.Callback {
   }
 
   override fun onDestroy() {
+    NativeBridge.detachWebViewContainer(webViewContainer)
     NativeBridge.shutdown()
     super.onDestroy()
   }

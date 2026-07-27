@@ -20,6 +20,20 @@ pub(all) enum AndroidEvent {
   SurfaceDestroyed
   WorkerAttached
   UiTask
+  WebView(Int64, WebViewEvent)
+} derive(Eq, Debug)
+
+///|
+/// Events emitted by an Android WebView owned by the Kotlin host. Payloads are
+/// UTF-8 normalised before entering MoonBit.
+pub(all) enum WebViewEvent {
+  Created(String)
+  NavigationStarted(String)
+  NavigationFinished(String)
+  TitleChanged(String)
+  ScriptResult(String)
+  Failed(String)
+  Destroyed
 } derive(Eq, Debug)
 
 ///|

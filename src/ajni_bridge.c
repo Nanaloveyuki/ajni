@@ -1,5 +1,6 @@
 #if defined(AJNI_STANDALONE_JNI)
 #define MOONBIT_FFI_EXPORT
+typedef uint8_t *moonbit_bytes_t;
 static void moonbit_decref(void *value) { (void)value; }
 #else
 #include <moonbit.h>
@@ -10,6 +11,8 @@ typedef void (*ajni_event_callback)(void *, int32_t, int32_t, int32_t);
 
 #if defined(AJNI_USE_MOONBIT_EXPORTS)
 extern int32_t ajni_dispatch_event(int32_t kind, int32_t first, int32_t second);
+extern int32_t ajni_dispatch_webview_event(int32_t kind, int64_t handle,
+                                           moonbit_bytes_t payload);
 extern void moonbit_runtime_init(int argc, char **argv);
 extern void moonbit_init(void);
 #endif
@@ -268,6 +271,29 @@ static jstring ajni_native_echo(JNIEnv *env, jclass unused, jstring text) {
   return result;
 }
 
+static void ajni_emit_webview(JNIEnv *env, jint kind, jlong handle, jstring payload) {
+#if defined(AJNI_USE_MOONBIT_EXPORTS)
+  size_t length = 0;
+  char *utf8 = payload == NULL ? NULL : ajni_utf8_from_string(env, payload, &length);
+  if (payload != NULL && utf8 == NULL) return;
+  moonbit_bytes_t bytes = moonbit_make_bytes((int32_t)length, 0);
+  if (bytes == NULL) {
+    free(utf8);
+    AJNI_LOGE("could not allocate MoonBit WebView event payload");
+    return;
+  }
+  if (length > 0) memcpy(bytes, utf8, length);
+  free(utf8);
+  ajni_dispatch_webview_event(kind, handle, bytes);
+  moonbit_decref(bytes);
+#else
+  (void)env;
+  (void)kind;
+  (void)handle;
+  (void)payload;
+#endif
+}
+
 static void ajni_native_initialize(JNIEnv *env, jclass unused, jobject context) {
   (void)unused;
   if (context == NULL) {
@@ -358,6 +384,12 @@ static void ajni_native_on_ui_task(JNIEnv *env, jclass unused) {
   ajni_emit(AJNI_UI_TASK, 0, 0);
 }
 
+static void ajni_native_webview_event(JNIEnv *env, jclass unused, jint kind, jlong handle,
+                                      jstring payload) {
+  (void)unused;
+  ajni_emit_webview(env, kind, handle, payload);
+}
+
 static void *ajni_worker_main(void *unused) {
   (void)unused;
   JNIEnv *env = NULL;
@@ -408,6 +440,52 @@ MOONBIT_FFI_EXPORT int32_t ajni_start_worker(void) {
   return 1;
 }
 
+MOONBIT_FFI_EXPORT int32_t ajni_webview_command(int32_t command, int64_t handle,
+                                                 moonbit_bytes_t payload) {
+  if (!g_initialized || g_vm == NULL || g_bridge_class == NULL || payload == NULL) return 0;
+  JNIEnv *env = NULL;
+  int attached = 0;
+  if ((*g_vm)->GetEnv(g_vm, (void **)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+    if ((*g_vm)->AttachCurrentThread(g_vm, &env, NULL) != JNI_OK) return 0;
+    attached = 1;
+  }
+  int32_t length = Moonbit_array_length(payload);
+  jstring text = ajni_string_from_utf8(env, (const char *)payload, (size_t)length);
+  if (text == NULL || !ajni_check_exception(env, "NewString(WebView command)")) {
+    if (attached) (*g_vm)->DetachCurrentThread(g_vm);
+    return 0;
+  }
+  jmethodID method = (*env)->GetStaticMethodID(env, g_bridge_class, "webViewCommand",
+                                                "(IJLjava/lang/String;)Z");
+  jboolean queued = JNI_FALSE;
+  if (method != NULL) {
+    queued = (*env)->CallStaticBooleanMethod(env, g_bridge_class, method, command, (jlong)handle, text);
+  }
+  int ok = method != NULL && queued == JNI_TRUE && ajni_check_exception(env, "NativeBridge.webViewCommand");
+  (*env)->DeleteLocalRef(env, text);
+  if (attached) (*g_vm)->DetachCurrentThread(g_vm);
+  return ok ? 1 : 0;
+}
+
+MOONBIT_FFI_EXPORT int32_t ajni_webview_set_bounds(int64_t handle, int32_t x, int32_t y,
+                                                    int32_t width, int32_t height) {
+  if (!g_initialized || g_vm == NULL || g_bridge_class == NULL) return 0;
+  JNIEnv *env = NULL;
+  int attached = 0;
+  if ((*g_vm)->GetEnv(g_vm, (void **)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+    if ((*g_vm)->AttachCurrentThread(g_vm, &env, NULL) != JNI_OK) return 0;
+    attached = 1;
+  }
+  jmethodID method = (*env)->GetStaticMethodID(env, g_bridge_class, "webViewSetBounds", "(JIIII)Z");
+  jboolean queued = JNI_FALSE;
+  if (method != NULL) {
+    queued = (*env)->CallStaticBooleanMethod(env, g_bridge_class, method, (jlong)handle, x, y, width, height);
+  }
+  int ok = method != NULL && queued == JNI_TRUE && ajni_check_exception(env, "NativeBridge.webViewSetBounds");
+  if (attached) (*g_vm)->DetachCurrentThread(g_vm);
+  return ok ? 1 : 0;
+}
+
 JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *unused) {
   (void)unused;
   g_vm = vm;
@@ -428,6 +506,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *unused) {
       {"nativeOnUiTask", "()V", (void *)ajni_native_on_ui_task},
       {"nativeStartWorker", "()V", (void *)ajni_native_start_worker},
       {"nativeEcho", "(Ljava/lang/String;)Ljava/lang/String;", (void *)ajni_native_echo},
+      {"nativeWebViewEvent", "(IJLjava/lang/String;)V", (void *)ajni_native_webview_event},
   };
   if ((*env)->RegisterNatives(env, local_class, methods, sizeof(methods) / sizeof(methods[0])) != JNI_OK ||
       !ajni_check_exception(env, "RegisterNatives")) {
@@ -461,5 +540,21 @@ JNIEXPORT void JNI_OnUnload(JavaVM *vm, void *unused) {
 MOONBIT_FFI_EXPORT int32_t ajni_runtime_ready(void) { return 1; }
 MOONBIT_FFI_EXPORT int32_t ajni_post_ui_callback(void) { return 1; }
 MOONBIT_FFI_EXPORT int32_t ajni_start_worker(void) { return 1; }
+MOONBIT_FFI_EXPORT int32_t ajni_webview_command(int32_t command, int64_t handle,
+                                                 moonbit_bytes_t payload) {
+  (void)command;
+  (void)handle;
+  (void)payload;
+  return 1;
+}
+MOONBIT_FFI_EXPORT int32_t ajni_webview_set_bounds(int64_t handle, int32_t x, int32_t y,
+                                                    int32_t width, int32_t height) {
+  (void)handle;
+  (void)x;
+  (void)y;
+  (void)width;
+  (void)height;
+  return 1;
+}
 
 #endif

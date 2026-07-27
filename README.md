@@ -18,8 +18,9 @@ from a native worker thread to Android's UI thread.
 `src/android_runtime` is the MoonBit native host package. Android CMake runs
 MoonBit to generate it, compiles the generated source plus MoonBit's runtime
 with the NDK, and defines `AJNI_USE_MOONBIT_EXPORTS`. Its stable C export is
-`ajni_dispatch_event`, so Java callbacks enter MoonBit without depending on
-MoonBit's generated symbol names.
+`ajni_dispatch_event`; WebView callbacks use
+`ajni_dispatch_webview_event`. Java callbacks therefore enter MoonBit without
+depending on MoonBit's generated symbol names.
 
 ## Build
 
@@ -55,6 +56,28 @@ adb shell am start -n dev.nanaloveyuki.ajni.demo/.MainActivity
 The `SurfaceView` changes from blue to teal after its first size callback. Tap
 **Start native worker** to create a native-owned pthread, attach it to ART, and
 post a callback through `Handler(Looper.getMainLooper())`.
+
+## WebView Host
+
+`ajni` provides an Android-only host contract for a later UI abstraction to
+use. The application must attach a caller-owned `FrameLayout` on the Android
+main thread before any WebView command:
+
+```kotlin
+NativeBridge.attachWebViewContainer(container)
+```
+
+The MoonBit facade marshals `webview_create`, `webview_navigate`,
+`webview_load_html`, `webview_eval`, `webview_set_bounds`, and
+`webview_destroy` to that UI thread when called from another thread. A
+`WebView` is keyed by an `Int64` handle and is removed and destroyed
+automatically when the container detaches.
+
+`AndroidEvent::WebView` carries the handle plus `Created`, navigation, title,
+script-result, failure, and destroyed events. Their string payloads are
+converted from Java UTF-16 to UTF-8 in JNI and lossily decoded at the MoonBit
+boundary. The host enables JavaScript for `eval`, disables file/content access
+and mixed content, and does not register `addJavascriptInterface`.
 
 ## Lifetime rules
 
