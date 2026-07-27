@@ -1,0 +1,9 @@
+import {
+  "Nanaloveyuki/ajni",
+}
+
+pkgtype(kind: "executable")
+
+options(
+  link: { "native": { "exports": [ "dispatch:ajni_dispatch_event" ] } },
+)

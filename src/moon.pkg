@@ -1,0 +1,11 @@
+import {
+  "moonbitlang/core/encoding/utf8",
+}
+
+options(
+  "native-stub": [ "ajni_bridge.c" ],
+  link: {
+    "native": { "exports": [ "dispatch_from_android:ajni_dispatch_event" ] },
+  },
+  targets: { "ffi.mbt": [ "native" ] },
+)
