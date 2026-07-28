@@ -9,6 +9,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /** Stable JNI entry class for applications that link ajni's native library. */
 object NativeBridge {
+  const val LIFECYCLE_CREATED = 1
+  const val LIFECYCLE_STARTED = 2
+  const val LIFECYCLE_RESUMED = 3
+  const val LIFECYCLE_PAUSED = 4
+  const val LIFECYCLE_STOPPED = 5
+  const val LIFECYCLE_DESTROYED = 6
   private const val UI_TASK_EVENT = 21
   private val initialized = AtomicBoolean(false)
   private val mainHandler = Handler(Looper.getMainLooper())
@@ -36,7 +42,13 @@ object NativeBridge {
 
   fun lifecycle(state: Int) {
     requireMainThread("lifecycle")
-    if (initialized.get()) nativeLifecycle(state)
+    if (initialized.get()) {
+      nativeLifecycle(state)
+      when (state) {
+        LIFECYCLE_RESUMED -> AjniWebViewHost.resume()
+        LIFECYCLE_PAUSED -> AjniWebViewHost.pause()
+      }
+    }
   }
 
   fun surfaceCreated(surface: Surface, width: Int, height: Int) {
