@@ -96,6 +96,7 @@ object AjniWebViewHost {
   ) {
     val scripts = mutableListOf<ScriptHandler>()
     var currentNavigationOperation = ""
+    var paused = false
     var destroyed = false
   }
 
@@ -126,6 +127,26 @@ object AjniWebViewHost {
     destroyAll()
     completePendingAssets(null, unavailableAssetResponse(503, "WebView host detached"))
     container = null
+  }
+
+  fun pause() {
+    requireMainThread("pause")
+    webViews.values.forEach { state ->
+      if (isLive(state) && !state.paused) {
+        state.view.onPause()
+        state.paused = true
+      }
+    }
+  }
+
+  fun resume() {
+    requireMainThread("resume")
+    webViews.values.forEach { state ->
+      if (isLive(state) && state.paused) {
+        state.view.onResume()
+        state.paused = false
+      }
+    }
   }
 
   fun command(command: Int, handle: Long, payload: String, requestId: String): Boolean {
@@ -180,6 +201,9 @@ object AjniWebViewHost {
   fun setEventObserverForTesting(observer: ((Int, Long, String, String) -> Unit)?) {
     eventObserverForTesting = observer
   }
+
+  @VisibleForTesting
+  fun isWebViewPausedForTesting(handle: Long): Boolean = webViews[handle]?.paused ?: false
 
   private fun createLegacy(handle: Long, initialUrl: String, operationId: String) {
     if (webViews.containsKey(handle)) {

@@ -60,10 +60,18 @@ import dev.nanaloveyuki.ajni.host.NativeBridge
 NativeBridge.initialize(applicationContext)
 NativeBridge.attachWebViewContainer(container)
 
+// Forward every Activity lifecycle state on the main thread.
+NativeBridge.lifecycle(state)
+
 // During Activity teardown:
 NativeBridge.detachWebViewContainer(container)
 NativeBridge.shutdown()
 ```
+
+`NativeBridge.LIFECYCLE_RESUMED` and `NativeBridge.LIFECYCLE_PAUSED` also
+resume and pause attached WebViews. Attaching a replacement container destroys
+views in the previous container, so each Activity or host recreation starts
+from an explicit new `create` call.
 
 Use `android/app/src/main/cpp/CMakeLists.txt` as the integration template. It
 generates the MoonBit Android host, compiles the MoonBit runtime, and links

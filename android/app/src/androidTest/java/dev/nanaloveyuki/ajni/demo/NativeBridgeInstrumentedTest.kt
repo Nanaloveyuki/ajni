@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.nanaloveyuki.ajni.host.AjniWebViewHost
 import dev.nanaloveyuki.ajni.host.NativeBridge
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CountDownLatch
@@ -41,6 +42,45 @@ class NativeBridgeInstrumentedTest {
     instrumentation.runOnMainSync {
       assertEquals(0, host.childCount)
       NativeBridge.detachWebViewContainer(host)
+    }
+  }
+
+  @Test
+  fun webViewHostPausesAndRecreatesAcrossContainers() {
+    val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+    val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+    val destroyed = CountDownLatch(1)
+    val firstHandle = 81L
+    val secondHandle = 82L
+    lateinit var firstHost: FrameLayout
+    lateinit var secondHost: FrameLayout
+    AjniWebViewHost.setEventObserverForTesting { kind, handle, _, _ ->
+      if (kind == AjniWebViewHost.DESTROYED && handle == firstHandle) destroyed.countDown()
+    }
+    instrumentation.runOnMainSync {
+      NativeBridge.initialize(context)
+      firstHost = FrameLayout(context)
+      NativeBridge.attachWebViewContainer(firstHost)
+      assertTrue(NativeBridge.webViewCommand(AjniWebViewHost.CREATE, firstHandle, "", "create-first"))
+    }
+    instrumentation.waitForIdleSync()
+    instrumentation.runOnMainSync {
+      assertEquals(1, firstHost.childCount)
+      NativeBridge.lifecycle(NativeBridge.LIFECYCLE_PAUSED)
+      assertTrue(AjniWebViewHost.isWebViewPausedForTesting(firstHandle))
+      NativeBridge.lifecycle(NativeBridge.LIFECYCLE_RESUMED)
+      assertFalse(AjniWebViewHost.isWebViewPausedForTesting(firstHandle))
+      secondHost = FrameLayout(context)
+      NativeBridge.attachWebViewContainer(secondHost)
+      assertEquals(0, firstHost.childCount)
+      assertTrue(NativeBridge.webViewCommand(AjniWebViewHost.CREATE, secondHandle, "", "create-second"))
+    }
+    assertTrue("old WebView was not destroyed during container recreation", destroyed.await(2, TimeUnit.SECONDS))
+    instrumentation.waitForIdleSync()
+    instrumentation.runOnMainSync {
+      assertEquals(1, secondHost.childCount)
+      NativeBridge.detachWebViewContainer(secondHost)
+      AjniWebViewHost.setEventObserverForTesting(null)
     }
   }
 

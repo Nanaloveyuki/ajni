@@ -49,12 +49,12 @@ class MainActivity : ComponentActivity(), SurfaceHolder.Callback {
     setContentView(root)
     NativeBridge.attachWebViewContainer(webViewContainer)
     lifecycle.addObserver(object : DefaultLifecycleObserver {
-      override fun onCreate(owner: LifecycleOwner) = forward(1, "created")
-      override fun onStart(owner: LifecycleOwner) = forward(2, "started")
-      override fun onResume(owner: LifecycleOwner) = forward(3, "resumed")
-      override fun onPause(owner: LifecycleOwner) = forward(4, "paused")
-      override fun onStop(owner: LifecycleOwner) = forward(5, "stopped")
-      override fun onDestroy(owner: LifecycleOwner) = forward(6, "destroyed")
+      override fun onCreate(owner: LifecycleOwner) = forward(NativeBridge.LIFECYCLE_CREATED, "created")
+      override fun onStart(owner: LifecycleOwner) = forward(NativeBridge.LIFECYCLE_STARTED, "started")
+      override fun onResume(owner: LifecycleOwner) = forward(NativeBridge.LIFECYCLE_RESUMED, "resumed")
+      override fun onPause(owner: LifecycleOwner) = forward(NativeBridge.LIFECYCLE_PAUSED, "paused")
+      override fun onStop(owner: LifecycleOwner) = forward(NativeBridge.LIFECYCLE_STOPPED, "stopped")
+      override fun onDestroy(owner: LifecycleOwner) = forward(NativeBridge.LIFECYCLE_DESTROYED, "destroyed")
     })
   }
 
