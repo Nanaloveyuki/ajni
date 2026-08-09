@@ -16,7 +16,7 @@ endif()
 find_program(MOON_EXECUTABLE moon REQUIRED)
 set(MOONBIT_HOST_SOURCE "${AJNI_ROOT}/_build/native/release/build/android_runtime/android_runtime.c")
 set(MOONBIT_RUNTIME_SOURCE "${MOON_HOME}/lib/runtime.c")
-set(AJNI_BRIDGE_SOURCE "${AJNI_ROOT}/src/ajni_bridge.c")
+set(AJNI_BRIDGE_SOURCE "${AJNI_ROOT}/src/android/ajni_bridge.c")
 set(AJNI_WEBVIEW_BRIDGE_SOURCE "${AJNI_ROOT}/src/webview/ajni_webview_bridge.c")
 
 if(NOT EXISTS "${MOONBIT_RUNTIME_SOURCE}")
@@ -31,15 +31,16 @@ add_custom_command(
     "${AJNI_BRIDGE_SOURCE}"
     "${AJNI_ROOT}/src/android_runtime/main.mbt"
     "${AJNI_ROOT}/src/android_runtime/moon.pkg"
-    "${AJNI_ROOT}/src/runtime.mbt"
+    "${AJNI_ROOT}/src/android/runtime.mbt"
+    "${AJNI_ROOT}/src/android/types.mbt"
     "${AJNI_ROOT}/src/types.mbt"
-    "${AJNI_ROOT}/src/ffi.mbt"
+    "${AJNI_ROOT}/src/android/ffi.mbt"
     "${AJNI_ROOT}/src/webview/runtime.mbt"
     "${AJNI_ROOT}/src/webview/types.mbt"
     "${AJNI_ROOT}/src/webview/ffi.mbt"
     "${AJNI_ROOT}/src/webview/moon.pkg"
     "${AJNI_WEBVIEW_BRIDGE_SOURCE}"
-    "${AJNI_ROOT}/src/android_compat.h"
+    "${AJNI_ROOT}/src/android/android_compat.h"
   COMMENT "Generating MoonBit Android runtime source"
   VERBATIM
 )
@@ -57,5 +58,5 @@ target_compile_definitions(ajni PRIVATE AJNI_USE_MOONBIT_EXPORTS=1 AJNI_FEATURE_
 target_include_directories(ajni PRIVATE "${MOON_HOME}/include")
 set_source_files_properties("${AJNI_BRIDGE_SOURCE}" PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")
 set_source_files_properties("${AJNI_WEBVIEW_BRIDGE_SOURCE}" PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")
-set_source_files_properties("${MOONBIT_RUNTIME_SOURCE}" PROPERTIES COMPILE_OPTIONS "-include;${AJNI_ROOT}/src/android_compat.h")
+set_source_files_properties("${MOONBIT_RUNTIME_SOURCE}" PROPERTIES COMPILE_OPTIONS "-include;${AJNI_ROOT}/src/android/android_compat.h")
 target_link_libraries(ajni android log)

@@ -89,4 +89,3 @@ pub fn WebViewResourceLimits::new(max_page_message_bytes? : Int, max_pending_ass
 // Type aliases
 
 // Traits
-

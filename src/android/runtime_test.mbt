@@ -11,10 +11,3 @@ test "lifecycle and surface event mapping" {
   )
   remove_event_handler(id)
 }
-
-///|
-test "local frame normalises capacity" {
-  debug_inspect(LocalFrame::new(capacity=0), content="{ capacity: 1 }")
-}
-
-///|

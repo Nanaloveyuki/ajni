@@ -354,26 +354,31 @@ static void ajni_native_initialize(JNIEnv *env, jclass unused, jobject context) 
     return;
   }
   jclass context_class = (*env)->GetObjectClass(env, context);
-  jmethodID get_loader = (*env)->GetMethodID(env, context_class, "getClassLoader", "()Ljava/lang/ClassLoader;");
-  jobject loader = get_loader == NULL ? NULL : (*env)->CallObjectMethod(env, context, get_loader);
-  if (!ajni_check_exception(env, "Context.getClassLoader")) {
-    if (context_class != NULL) (*env)->DeleteLocalRef(env, context_class);
+  if (context_class == NULL || !ajni_check_exception(env, "GetObjectClass(Context)")) {
     return;
   }
-  bool initialized;
+  jmethodID get_loader = (*env)->GetMethodID(env, context_class, "getClassLoader", "()Ljava/lang/ClassLoader;");
+  if (get_loader == NULL || !ajni_check_exception(env, "Context.getClassLoader")) {
+    (*env)->DeleteLocalRef(env, context_class);
+    return;
+  }
+  jobject loader = get_loader == NULL ? NULL : (*env)->CallObjectMethod(env, context, get_loader);
+  if (loader == NULL || !ajni_check_exception(env, "Context.getClassLoader")) {
+    (*env)->DeleteLocalRef(env, context_class);
+    return;
+  }
+  jobject global_loader = (*env)->NewGlobalRef(env, loader);
+  (*env)->DeleteLocalRef(env, loader);
+  (*env)->DeleteLocalRef(env, context_class);
+  if (global_loader == NULL || !ajni_check_exception(env, "NewGlobalRef(ClassLoader)")) {
+    return;
+  }
   pthread_mutex_lock(&g_lock);
-  if (g_class_loader != NULL) {
-    (*env)->DeleteGlobalRef(env, g_class_loader);
-  }
-  g_class_loader = loader == NULL ? NULL : (*env)->NewGlobalRef(env, loader);
-  g_initialized = g_class_loader != NULL;
-  initialized = g_initialized;
+  jobject old_loader = g_class_loader;
+  g_class_loader = global_loader;
+  g_initialized = true;
   pthread_mutex_unlock(&g_lock);
-  if (loader != NULL) (*env)->DeleteLocalRef(env, loader);
-  if (context_class != NULL) (*env)->DeleteLocalRef(env, context_class);
-  if (!initialized) {
-    (*env)->ThrowNew(env, "java/lang/IllegalStateException", "could not retain application ClassLoader");
-  }
+  if (old_loader != NULL) (*env)->DeleteGlobalRef(env, old_loader);
 }
 
 static void ajni_native_shutdown(JNIEnv *env, jclass unused) {
