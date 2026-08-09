@@ -159,7 +159,8 @@ pub fn set_bounds(
   width : Int,
   height : Int,
 ) -> Unit raise @ajni.JniError {
-  if native_set_bounds(handle, x, y, width, height) == 0 {
+  if !@android.runtime_ready() ||
+    native_set_bounds(handle, x, y, width, height) == 0 {
     raise NotInitialized
   }
 }
@@ -171,7 +172,8 @@ fn command(
   payload : String,
   request_id : String,
 ) -> Unit raise @ajni.JniError {
-  if native_command(
+  if !@android.runtime_ready() ||
+    native_command(
       command,
       handle,
       @ajni.encode_utf8(payload),

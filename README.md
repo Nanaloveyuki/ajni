@@ -1,13 +1,15 @@
 # ajni
 
-`ajni` provides MoonBit-facing Android JNI runtime primitives. It supplies a
-stable Kotlin host, lifecycle and UI-thread callbacks, safe Java UTF-16/MoonBit
-UTF-8 conversion, and an optional Android `WebView` feature.
+`ajni` provides MoonBit-facing JVM JNI primitives and an Android runtime
+bridge. The root package builds checked JVM class, type, method, and
+native-method declarations; the Android package supplies a stable Kotlin host,
+lifecycle and UI-thread callbacks, safe Java UTF-16/MoonBit UTF-8 conversion,
+and an optional Android `WebView` feature.
 
-The core package and WebView feature are separate. Applications that only need
-lifecycle or UI callbacks import `Nanaloveyuki/ajni`; applications that embed a
-browser additionally import `Nanaloveyuki/ajni/webview` and link its native
-stub.
+The generic, Android, and WebView packages are separate. Applications that
+only need JVM JNI declarations import `Nanaloveyuki/ajni`; Android hosts add
+`Nanaloveyuki/ajni/android`; applications that embed a browser additionally
+import `Nanaloveyuki/ajni/webview` and link its native stub.
 
 ## Install
 
@@ -23,29 +25,51 @@ import {
 }
 ```
 
-## Core Runtime
+## Generic JNI Declarations
 
-Install an event handler before the Kotlin host forwards Activity or Surface
-events. The handler returns a token that can be removed during shutdown.
+The root package has no Android dependency. It validates internal class names,
+prevents `void` parameters, enforces the JVM's 255 array-dimension and
+parameter-slot limits, and keeps raw JNI pointers out of MoonBit:
+
+```moonbit nocheck
+let string = try! @ajni.JniClass::parse("java/lang/String")
+let signature = try! @ajni.JniMethod::new(
+  [@ajni.JniType::object(string)],
+  return_type=@ajni.JniType::boolean(),
+)
+let registration = try! @ajni.NativeMethod::new("nativeAcceptsString", signature)
+println(registration.descriptor()) // (Ljava/lang/String;)Z
+```
+
+Platform-specific code can consume these values when registering JNI methods.
+Raw `JNIEnv*`, `jobject`, global-reference deletion, and Java attachment
+remain C-owned because their lifetimes cannot be safely encoded as plain
+MoonBit values.
+
+## Android Runtime
+
+Import `Nanaloveyuki/ajni/android` to install an event handler before the
+Kotlin host forwards Activity or Surface events. The handler returns a token
+that can be removed during shutdown.
 
 ```moonbit nocheck
 import {
-  "Nanaloveyuki/ajni",
+  "Nanaloveyuki/ajni/android",
 }
 
-let subscription = @ajni.install_event_handler(event => match event {
-  @ajni.AndroidEvent::Lifecycle(@ajni.Lifecycle::Resumed) => println("resumed")
-  @ajni.AndroidEvent::UiTask => println("Android main Looper callback")
+let subscription = @android.install_event_handler(event => match event {
+  @android.AndroidEvent::Lifecycle(@android.Lifecycle::Resumed) => println("resumed")
+  @android.AndroidEvent::UiTask => println("Android main Looper callback")
   _ => ()
 })
 
 // Remove the observer before application shutdown.
-@ajni.remove_event_handler(subscription)
+@android.remove_event_handler(subscription)
 ```
 
-`@ajni.post_to_ui()` schedules an asynchronous callback on Android's main
-Looper. `@ajni.start_worker()` demonstrates a native-owned thread attaching to
-ART, posting back to the UI thread, then detaching.
+`@android.post_to_ui()` schedules an asynchronous callback on Android's main
+Looper. `@android.start_worker()` demonstrates a native-owned thread attaching
+to ART, posting back to the UI thread, then detaching.
 
 ## Android Host
 

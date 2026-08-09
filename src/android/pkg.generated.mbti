@@ -1,0 +1,47 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Nanaloveyuki/ajni/android"
+
+import {
+  "Nanaloveyuki/ajni",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn dispatch_from_android(Int, Int, Int) -> Unit
+
+pub fn emit_for_test(Int, Int, Int) -> Unit
+
+pub fn install_event_handler((AndroidEvent) -> Unit) -> Int
+
+pub fn post_to_ui() -> Unit raise @ajni.JniError
+
+pub fn remove_event_handler(Int) -> Unit
+
+pub fn runtime_ready() -> Bool
+
+pub fn start_worker() -> Unit raise @ajni.JniError
+
+// Errors
+
+// Types and methods
+pub(all) enum AndroidEvent {
+  Lifecycle(Lifecycle)
+  SurfaceCreated(Int, Int)
+  SurfaceChanged(Int, Int)
+  SurfaceDestroyed
+  WorkerAttached
+  UiTask
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Lifecycle {
+  Created
+  Started
+  Resumed
+  Paused
+  Stopped
+  Destroyed
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

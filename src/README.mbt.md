@@ -1,26 +1,26 @@
-# ajni Core
+# ajni JNI
 
-`Nanaloveyuki/ajni` is the Android JNI runtime package. It exposes lifecycle,
-surface, worker, and Android main-Looper callbacks without importing the
-optional WebView bridge.
+`Nanaloveyuki/ajni` provides checked JVM JNI declarations without an Android
+dependency. It intentionally does not expose raw `JNIEnv*`, `jobject`, or
+function pointers because their lifetime rules cannot be represented safely by
+plain MoonBit values.
 
-## Runtime Events
+## JNI Descriptors
 
 ```mbt check
 ///|
 test {
-  let id = install_event_handler(_event => ())
-  remove_event_handler(id)
+  let string = try! JniClass::parse("java/lang/String")
+  let signature = try! JniMethod::new(
+    [JniType::object(string)],
+    return_type=JniType::boolean(),
+  )
+  let registration = try! NativeMethod::new("nativeAcceptsString", signature)
+  assert_eq(registration.descriptor(), "(Ljava/lang/String;)Z")
 }
 ```
 
-The Kotlin host invokes native callbacks only after
-`dev.nanaloveyuki.ajni.host.NativeBridge.initialize(...)`. Use
-`post_to_ui()` for an asynchronous main-Looper callback and `start_worker()`
-for a native-owned thread that attaches to ART.
-
-## Optional Browser Support
-
-Browser support is deliberately outside this package. Import
-`Nanaloveyuki/ajni/webview` only when the Android application embeds a
-`WebView`; its package documentation describes the command and event contract.
+`JniType` cannot represent `void`; arrays and method parameters are bounded
+by JVM limits. Import `Nanaloveyuki/ajni/android` for Android lifecycle,
+Surface, worker, and main-Looper callbacks. Browser support remains in the
+optional `Nanaloveyuki/ajni/webview` package.

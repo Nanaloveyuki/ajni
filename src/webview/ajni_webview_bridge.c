@@ -14,7 +14,7 @@ typedef uint8_t *moonbit_bytes_t;
 #include <stdlib.h>
 #include <string.h>
 
-#include "../ajni_android_internal.h"
+#include "../android/ajni_android_internal.h"
 
 #if defined(AJNI_USE_MOONBIT_EXPORTS)
 extern int32_t ajni_dispatch_webview_event(int32_t kind, int64_t handle,

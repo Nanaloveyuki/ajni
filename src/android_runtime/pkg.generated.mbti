@@ -13,4 +13,3 @@ pub fn dispatch_webview(Int, Int64, Bytes, Bytes) -> Unit
 // Type aliases
 
 // Traits
-

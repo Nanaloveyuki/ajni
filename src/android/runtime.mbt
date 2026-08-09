@@ -40,7 +40,7 @@ pub fn remove_event_handler(id : Int) -> Unit {
 ///|
 /// Requests a callback on Android's main Looper. The callback is asynchronous
 /// even if the caller is already on the UI thread.
-pub fn post_to_ui() -> Unit raise JniError {
+pub fn post_to_ui() -> Unit raise @ajni.JniError {
   if native_post_ui_callback() == 0 {
     raise NotInitialized
   }
@@ -50,7 +50,7 @@ pub fn post_to_ui() -> Unit raise JniError {
 /// Starts a native-owned worker thread. The bridge attaches it to the VM,
 /// then posts `WorkerAttached` and `UiTask` to the Android main Looper before
 /// detaching it.
-pub fn start_worker() -> Unit raise JniError {
+pub fn start_worker() -> Unit raise @ajni.JniError {
   if native_start_worker() == 0 {
     raise NotInitialized
   }
