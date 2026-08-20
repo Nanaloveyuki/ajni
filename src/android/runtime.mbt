@@ -91,7 +91,11 @@ fn dispatch_native_event(kind : Int, first : Int, second : Int) -> Unit {
     21 => UiTask
     _ => return
   }
+  let snapshot : Array[(AndroidEvent) -> Unit] = []
   for _, handler in handlers {
+    snapshot.push(handler)
+  }
+  for handler in snapshot {
     handler(event)
   }
 }

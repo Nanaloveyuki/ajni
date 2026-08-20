@@ -3,9 +3,16 @@
 #if defined(AJNI_STANDALONE_JNI)
 #define MOONBIT_FFI_EXPORT
 typedef uint8_t *moonbit_bytes_t;
+static void moonbit_incref(void *value) { (void)value; }
 static void moonbit_decref(void *value) { (void)value; }
 #else
 #include <moonbit.h>
+#endif
+
+#if defined(__ANDROID__)
+#include <stdbool.h>
+#include <stddef.h>
+#include <pthread.h>
 #endif
 
 typedef void (*ajni_event_callback)(void *, int32_t, int32_t, int32_t);
@@ -19,23 +26,80 @@ extern void moonbit_init(void);
 static ajni_event_callback g_event_callback = NULL;
 static void *g_event_context = NULL;
 
+#if defined(__ANDROID__)
+static pthread_mutex_t g_event_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_event_idle = PTHREAD_COND_INITIALIZER;
+static size_t g_active_event_callbacks = 0;
+static bool g_event_shutting_down = false;
+
+static void ajni_event_callback_finished(void) {
+  pthread_mutex_lock(&g_event_lock);
+  --g_active_event_callbacks;
+  pthread_cond_broadcast(&g_event_idle);
+  pthread_mutex_unlock(&g_event_lock);
+}
+#endif
+
 static void ajni_emit(int32_t kind, int32_t first, int32_t second) {
 #if defined(AJNI_USE_MOONBIT_EXPORTS)
-  ajni_dispatch_event(kind, first, second);
-#else
-  if (g_event_callback != NULL) {
-    g_event_callback(g_event_context, kind, first, second);
+#if defined(__ANDROID__)
+  pthread_mutex_lock(&g_event_lock);
+  if (g_event_shutting_down) {
+    pthread_mutex_unlock(&g_event_lock);
+    return;
   }
+  ++g_active_event_callbacks;
+  pthread_mutex_unlock(&g_event_lock);
+#endif
+  ajni_dispatch_event(kind, first, second);
+#if defined(__ANDROID__)
+  ajni_event_callback_finished();
+#endif
+#else
+#if defined(__ANDROID__)
+  ajni_event_callback callback = NULL;
+  void *context = NULL;
+  pthread_mutex_lock(&g_event_lock);
+  if (!g_event_shutting_down) {
+    callback = g_event_callback;
+    context = g_event_context;
+    if (callback != NULL) {
+      if (context != NULL) moonbit_incref(context);
+      ++g_active_event_callbacks;
+    }
+  }
+  pthread_mutex_unlock(&g_event_lock);
+  if (callback != NULL) {
+    callback(context, kind, first, second);
+    if (context != NULL) moonbit_decref(context);
+    ajni_event_callback_finished();
+  }
+#else
+  if (g_event_callback != NULL) g_event_callback(g_event_context, kind, first, second);
+#endif
 #endif
 }
 
 MOONBIT_FFI_EXPORT void ajni_install_event_callback(
     ajni_event_callback callback, void *context) {
+#if defined(__ANDROID__)
+  void *old_context = NULL;
+  pthread_mutex_lock(&g_event_lock);
+  old_context = g_event_context;
+  g_event_callback = callback;
+  g_event_context = context;
+  g_event_shutting_down = false;
+  pthread_mutex_unlock(&g_event_lock);
+  if (old_context != NULL && old_context != context) {
+    moonbit_decref(old_context);
+  }
+#else
   if (g_event_context != NULL) {
     moonbit_decref(g_event_context);
   }
   g_event_callback = callback;
   g_event_context = context;
+#endif
 }
 
 MOONBIT_FFI_EXPORT void ajni_emit_for_test(
@@ -546,6 +610,9 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *unused) {
   pthread_mutex_lock(&g_lock);
   g_bridge_class = bridge_class;
   pthread_mutex_unlock(&g_lock);
+  pthread_mutex_lock(&g_event_lock);
+  g_event_shutting_down = false;
+  pthread_mutex_unlock(&g_event_lock);
   return JNI_VERSION_1_6;
 }
 
@@ -561,11 +628,16 @@ JNIEXPORT void JNI_OnUnload(JavaVM *vm, void *unused) {
   g_vm = NULL;
   pthread_mutex_unlock(&g_lock);
   if (bridge_class != NULL) (*env)->DeleteGlobalRef(env, bridge_class);
-  if (g_event_context != NULL) {
-    moonbit_decref(g_event_context);
-    g_event_context = NULL;
-  }
+  pthread_mutex_lock(&g_event_lock);
+  g_event_shutting_down = true;
   g_event_callback = NULL;
+  while (g_active_event_callbacks != 0) {
+    pthread_cond_wait(&g_event_idle, &g_event_lock);
+  }
+  void *event_context = g_event_context;
+  g_event_context = NULL;
+  pthread_mutex_unlock(&g_event_lock);
+  if (event_context != NULL) moonbit_decref(event_context);
 }
 
 #else
