@@ -91,13 +91,13 @@ test "resource limits default and encoded asset response are bounded fields" {
     headers: [{ name: "Cache-Control", value: "no-store" }],
     body: b"ok",
   })
-  let fields = decode_fields(wire)
-  assert_eq(decode_field(fields, "request_id"), "asset-4")
-  assert_eq(decode_field(fields, "status"), "200")
-  assert_eq(decode_field(fields, "mime"), "text/plain")
-  assert_eq(decode_field(fields, "encoding"), "utf-8")
-  assert_eq(decode_field(fields, "body"), "b2s")
-  assert_true(decode_field(fields, "headers") != "")
+  let fields = decode_fields(wire).unwrap_or(Map([]))
+  assert_eq(fields.get("request_id").unwrap_or(""), "asset-4")
+  assert_eq(fields.get("status").unwrap_or(""), "200")
+  assert_eq(fields.get("mime").unwrap_or(""), "text/plain")
+  assert_eq(fields.get("encoding").unwrap_or(""), "utf-8")
+  assert_eq(fields.get("body").unwrap_or(""), "b2s")
+  assert_true(fields.get("headers").unwrap_or("") != "")
 }
 
 ///|
@@ -115,17 +115,49 @@ test "create wire payload preserves trusted origin scripts and quotas" {
       asset_response_timeout_millis=250,
     ),
   )
-  let fields = decode_fields(wire)
-  assert_eq(decode_field(fields, "origin"), "https://app.orbit.invalid")
-  assert_eq(decode_field(fields, "initial_kind"), "html")
-  assert_eq(decode_field(fields, "initial"), "<main>orbit</main>")
+  let fields = decode_fields(wire).unwrap_or(Map([]))
+  assert_eq(fields.get("origin").unwrap_or(""), "https://app.orbit.invalid")
+  assert_eq(fields.get("initial_kind").unwrap_or(""), "html")
+  assert_eq(fields.get("initial").unwrap_or(""), "<main>orbit</main>")
   assert_eq(
-    decode_field(fields, "base_url"),
+    fields.get("base_url").unwrap_or(""),
     "https://app.orbit.invalid/index.html",
   )
-  assert_eq(decode_field(fields, "scripts"), "d2luZG93Lm9yYml0UmVhZHkgPSB0cnVl")
-  assert_eq(decode_field(fields, "max_page_message_bytes"), "4096")
-  assert_eq(decode_field(fields, "max_pending_asset_requests"), "4")
-  assert_eq(decode_field(fields, "max_asset_response_bytes"), "8192")
-  assert_eq(decode_field(fields, "asset_response_timeout_millis"), "250")
+  assert_eq(
+    fields.get("scripts").unwrap_or(""),
+    "d2luZG93Lm9yYml0UmVhZHkgPSB0cnVl",
+  )
+  assert_eq(fields.get("max_page_message_bytes").unwrap_or(""), "4096")
+  assert_eq(fields.get("max_pending_asset_requests").unwrap_or(""), "4")
+  assert_eq(fields.get("max_asset_response_bytes").unwrap_or(""), "8192")
+  assert_eq(fields.get("asset_response_timeout_millis").unwrap_or(""), "250")
+}
+
+///|
+test "malformed webview fields are dropped instead of defaulting" {
+  let events : Array[Event] = []
+  let id = install_event_handler(fn(event) { events.push(event) })
+  dispatch_from_android(
+    37,
+    12L,
+    @ajni.encode_utf8("body=aGVsbG8&body=d29ybGQ&origin=aHR0cHM6Ly9hcHA"),
+    b"",
+  )
+  assert_eq(events.length(), 0)
+  remove_event_handler(id)
+}
+
+///|
+test "invalid base64 and missing fields are rejected" {
+  let events : Array[Event] = []
+  let id = install_event_handler(fn(event) { events.push(event) })
+  dispatch_from_android(
+    38,
+    13L,
+    @ajni.encode_utf8("request_id=%%%25&path="),
+    b"",
+  )
+  dispatch_from_android(37, 13L, @ajni.encode_utf8("body=aGVsbG8"), b"")
+  assert_eq(events.length(), 0)
+  remove_event_handler(id)
 }

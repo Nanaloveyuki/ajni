@@ -255,76 +255,163 @@ pub fn dispatch_from_android(
   detail : Bytes,
 ) -> Unit {
   let event_kind = match kind {
-    30 => EventKind::Created(@ajni.decode_utf8(payload))
-    31 => NavigationStarted(@ajni.decode_utf8(payload))
-    32 => NavigationFinished(@ajni.decode_utf8(payload))
-    33 => TitleChanged(@ajni.decode_utf8(payload))
-    34 => ScriptResult(@ajni.decode_utf8(detail), @ajni.decode_utf8(payload))
-    35 => Failed(@ajni.decode_utf8(payload))
+    30 =>
+      match decode_utf8_payload(payload) {
+        Some(value) => EventKind::Created(value)
+        None => return
+      }
+    31 =>
+      match decode_utf8_payload(payload) {
+        Some(value) => NavigationStarted(value)
+        None => return
+      }
+    32 =>
+      match decode_utf8_payload(payload) {
+        Some(value) => NavigationFinished(value)
+        None => return
+      }
+    33 =>
+      match decode_utf8_payload(payload) {
+        Some(value) => TitleChanged(value)
+        None => return
+      }
+    34 =>
+      match (decode_utf8_payload(detail), decode_utf8_payload(payload)) {
+        (Some(request_id), Some(result)) => ScriptResult(request_id, result)
+        _ => return
+      }
+    35 =>
+      match decode_utf8_payload(payload) {
+        Some(value) => Failed(value)
+        None => return
+      }
     36 => Destroyed
-    37 => decode_page_message(payload)
-    38 => decode_asset_request(payload)
-    39 => OperationFailed(@ajni.decode_utf8(detail), @ajni.decode_utf8(payload))
+    37 =>
+      match decode_page_message(payload) {
+        Some(event) => event
+        None => return
+      }
+    38 =>
+      match decode_asset_request(payload) {
+        Some(event) => event
+        None => return
+      }
+    39 =>
+      match (decode_utf8_payload(detail), decode_utf8_payload(payload)) {
+        (Some(request_id), Some(message)) =>
+          OperationFailed(request_id, message)
+        _ => return
+      }
     _ => return
   }
   let event = { handle, kind: event_kind }
+  let snapshot : Array[(Event) -> Unit] = []
   for _, handler in handlers {
+    snapshot.push(handler)
+  }
+  for handler in snapshot {
     handler(event)
   }
 }
 
 ///|
-fn decode_page_message(payload : Bytes) -> EventKind {
-  let fields = decode_fields(@ajni.decode_utf8(payload))
-  PageMessage(
-    decode_field(fields, "body"),
-    decode_field(fields, "origin"),
-    match decode_field(fields, "main_frame") {
-      "1" | "true" => true
-      _ => false
-    },
-  )
+fn decode_page_message(payload : Bytes) -> EventKind? {
+  let wire = match decode_utf8_payload(payload) {
+    Some(wire) => wire
+    None => return None
+  }
+  let fields = match decode_fields(wire) {
+    Some(fields) => fields
+    None => return None
+  }
+  match (fields.get("body"), fields.get("origin"), fields.get("main_frame")) {
+    (Some(body), Some(origin), Some(main_frame)) =>
+      match main_frame {
+        "1" | "true" => Some(PageMessage(body, origin, true))
+        "0" | "false" => Some(PageMessage(body, origin, false))
+        _ => None
+      }
+    _ => None
+  }
 }
 
 ///|
-fn decode_asset_request(payload : Bytes) -> EventKind {
-  let fields = decode_fields(@ajni.decode_utf8(payload))
-  AssetRequest({
-    id: decode_field(fields, "request_id"),
-    path: decode_field(fields, "path"),
-  })
+fn decode_asset_request(payload : Bytes) -> EventKind? {
+  let wire = match decode_utf8_payload(payload) {
+    Some(wire) => wire
+    None => return None
+  }
+  let fields = match decode_fields(wire) {
+    Some(fields) => fields
+    None => return None
+  }
+  match (fields.get("request_id"), fields.get("path")) {
+    (Some(id), Some(path)) => Some(AssetRequest({ id, path }))
+    _ => None
+  }
 }
 
 ///|
-fn decode_fields(value : String) -> Map[String, String] {
+fn decode_fields(value : String) -> Map[String, String]? {
   let fields : Map[String, String] = Map([])
+  if value.length() == 0 {
+    return Some(fields)
+  }
+
   for item in value.split("&") {
     let pair = item.split("=").to_array()
-    if pair.length() == 2 {
-      fields.set(pair[0].to_owned(), decode_base64url(pair[1].to_owned()))
+    if pair.length() != 2 {
+      return None
+    }
+    let name = pair[0].to_owned()
+    if !valid_field_name(name) || fields.contains(name) {
+      return None
+    }
+    match decode_base64url(pair[1].to_owned()) {
+      Some(decoded) => fields.set(name, decoded)
+      None => return None
     }
   }
-  fields
+  Some(fields)
 }
 
 ///|
-fn decode_field(fields : Map[String, String], name : String) -> String {
-  fields.get(name).unwrap_or("")
+fn valid_field_name(name : String) -> Bool {
+  if name.length() == 0 {
+    return false
+  }
+  for byte in @ajni.encode_utf8(name) {
+    match byte {
+      b'a'..=b'z' | b'_' => ()
+      _ => return false
+    }
+  }
+  true
 }
 
 ///|
-fn decode_base64url(value : String) -> String {
+fn decode_utf8_payload(payload : Bytes) -> String? {
+  let text = @utf8.decode(payload[:]) catch { _ => return None }
+  Some(text)
+}
+
+///|
+fn decode_base64url(value : String) -> String? {
   let output : Array[Byte] = []
   for byte in @ajni.encode_utf8(value) {
     output.push(
       match byte {
         b'-' => b'+'
         b'_' => b'/'
-        _ => byte
+        b'=' => b'='
+        b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' => byte
+        _ => return None
       },
     )
   }
-  @ajni.decode_utf8(
-    @base64.decode_lossy(@ajni.decode_utf8(Bytes::from_array(output))),
-  )
+  let decoded = @base64.decode(@ajni.decode_utf8(Bytes::from_array(output))) catch {
+    _ => return None
+  }
+  let text = @utf8.decode(decoded[:]) catch { _ => return None }
+  Some(text)
 }
