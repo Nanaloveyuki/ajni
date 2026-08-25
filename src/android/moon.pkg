@@ -2,6 +2,10 @@ import {
   "Nanaloveyuki/ajni",
 }
 
+import {
+  "moonbitlang/core/quickcheck",
+} for "test"
+
 options(
   "native-stub": [ "ajni_bridge.c" ],
   link: {

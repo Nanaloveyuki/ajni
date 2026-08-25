@@ -5,6 +5,14 @@ import {
   "moonbitlang/core/encoding/utf8",
 }
 
+import {
+  "moonbitlang/core/quickcheck",
+} for "test"
+
+import {
+  "moonbitlang/core/quickcheck",
+} for "wbtest"
+
 options(
   "native-stub": [ "ajni_webview_bridge.c" ],
   link: {
