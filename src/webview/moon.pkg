@@ -7,10 +7,6 @@ import {
 
 import {
   "moonbitlang/core/quickcheck",
-} for "test"
-
-import {
-  "moonbitlang/core/quickcheck",
 } for "wbtest"
 
 options(

@@ -11,3 +11,8 @@ pub(all) suberror JniError {
   TooManyParameterSlots
   TooManyArrayDimensions
 } derive(Debug)
+
+///|
+#deprecated("Use `Debug::to_repr` instead", skip_current_package=true)
+#doc(hidden)
+pub extend JniError with Debug::{to_repr}

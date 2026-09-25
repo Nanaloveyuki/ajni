@@ -5,6 +5,16 @@ pub struct JniClass {
 } derive(Eq, Debug)
 
 ///|
+#deprecated("Use `==` instead", skip_current_package=true)
+#doc(hidden)
+pub extend JniClass with Eq::{equal, not_equal}
+
+///|
+#deprecated("Use `Debug::to_repr` instead", skip_current_package=true)
+#doc(hidden)
+pub extend JniClass with Debug::{to_repr}
+
+///|
 pub fn JniClass::parse(internal_name : String) -> JniClass raise JniError {
   if internal_name.is_empty() ||
     internal_name.has_prefix("/") ||
@@ -39,48 +49,58 @@ pub struct JniType {
 } derive(Eq, Debug)
 
 ///|
+#deprecated("Use `==` instead", skip_current_package=true)
+#doc(hidden)
+pub extend JniType with Eq::{equal, not_equal}
+
+///|
+#deprecated("Use `Debug::to_repr` instead", skip_current_package=true)
+#doc(hidden)
+pub extend JniType with Debug::{to_repr}
+
+///|
 pub fn JniType::boolean() -> JniType {
-  { descriptor: "Z", parameter_slots: 1, array_dimensions: 0 }
+  { descriptor: "Z", parameter_slots: 1, array_dimensions: 0, }
 }
 
 ///|
 pub fn JniType::byte() -> JniType {
-  { descriptor: "B", parameter_slots: 1, array_dimensions: 0 }
+  { descriptor: "B", parameter_slots: 1, array_dimensions: 0, }
 }
 
 ///|
 pub fn JniType::char() -> JniType {
-  { descriptor: "C", parameter_slots: 1, array_dimensions: 0 }
+  { descriptor: "C", parameter_slots: 1, array_dimensions: 0, }
 }
 
 ///|
 pub fn JniType::short() -> JniType {
-  { descriptor: "S", parameter_slots: 1, array_dimensions: 0 }
+  { descriptor: "S", parameter_slots: 1, array_dimensions: 0, }
 }
 
 ///|
 pub fn JniType::int() -> JniType {
-  { descriptor: "I", parameter_slots: 1, array_dimensions: 0 }
+  { descriptor: "I", parameter_slots: 1, array_dimensions: 0, }
 }
 
 ///|
 pub fn JniType::long() -> JniType {
-  { descriptor: "J", parameter_slots: 2, array_dimensions: 0 }
+  { descriptor: "J", parameter_slots: 2, array_dimensions: 0, }
 }
 
 ///|
 pub fn JniType::float() -> JniType {
-  { descriptor: "F", parameter_slots: 1, array_dimensions: 0 }
+  { descriptor: "F", parameter_slots: 1, array_dimensions: 0, }
 }
 
 ///|
 pub fn JniType::double() -> JniType {
-  { descriptor: "D", parameter_slots: 2, array_dimensions: 0 }
+  { descriptor: "D", parameter_slots: 2, array_dimensions: 0, }
 }
 
 ///|
 pub fn JniType::object(class : JniClass) -> JniType {
-  { descriptor: class.descriptor(), parameter_slots: 1, array_dimensions: 0 }
+  { descriptor: class.descriptor(), parameter_slots: 1, array_dimensions: 0, }
 }
 
 ///|
@@ -105,6 +125,16 @@ pub fn JniType::descriptor(self : JniType) -> String {
 pub struct JniMethod {
   priv descriptor : String
 } derive(Eq, Debug)
+
+///|
+#deprecated("Use `==` instead", skip_current_package=true)
+#doc(hidden)
+pub extend JniMethod with Eq::{equal, not_equal}
+
+///|
+#deprecated("Use `Debug::to_repr` instead", skip_current_package=true)
+#doc(hidden)
+pub extend JniMethod with Debug::{to_repr}
 
 ///|
 pub fn JniMethod::new(
@@ -144,6 +174,16 @@ pub struct NativeMethod {
 } derive(Eq, Debug)
 
 ///|
+#deprecated("Use `==` instead", skip_current_package=true)
+#doc(hidden)
+pub extend NativeMethod with Eq::{equal, not_equal}
+
+///|
+#deprecated("Use `Debug::to_repr` instead", skip_current_package=true)
+#doc(hidden)
+pub extend NativeMethod with Debug::{to_repr}
+
+///|
 pub fn NativeMethod::new(
   name : String,
   signature : JniMethod,
@@ -158,7 +198,7 @@ pub fn NativeMethod::new(
     name.contains_code_unit(0) {
     raise InvalidNativeMethodName(name)
   }
-  { name, signature }
+  { name, signature, }
 }
 
 ///|

@@ -15,7 +15,7 @@ test "page messages decode structured trusted-origin fields" {
     b"",
   )
   match events[0] {
-    { handle: 9L, kind: PageMessage(body, origin, true) } => {
+    { handle: 9L, kind: PageMessage(body, origin, true), } => {
       assert_eq(body, "hello from page")
       assert_eq(origin, "https://app.orbit.invalid")
     }
@@ -66,12 +66,12 @@ test "asset requests and operation failures retain correlation identifiers" {
     @ajni.encode_utf8("load-4"),
   )
   match events[0] {
-    { handle: 11L, kind: AssetRequest({ id: "asset-2", path: "ui/main.js" }) } =>
+    { handle: 11L, kind: AssetRequest({ id: "asset-2", path: "ui/main.js", }), } =>
       ()
     _ => abort("expected an asset request")
   }
   match events[1] {
-    { handle: 11L, kind: OperationFailed("load-4", "timed out") } => ()
+    { handle: 11L, kind: OperationFailed("load-4", "timed out"), } => ()
     _ => abort("expected a correlated operation failure")
   }
   remove_event_handler(id)
@@ -88,7 +88,7 @@ test "resource limits default and encoded asset response are bounded fields" {
     status: 200,
     mime_type: "text/plain",
     encoding: "utf-8",
-    headers: [{ name: "Cache-Control", value: "no-store" }],
+    headers: [{ name: "Cache-Control", value: "no-store", }],
     body: b"ok",
   })
   let fields = decode_fields(wire).unwrap_or(Map([]))

@@ -42,27 +42,27 @@ fn generated_native_name(raw : Array[Int]) -> String {
 }
 
 ///|
-fn generated_type(raw : (Int, Int, Int)) -> (JniType, String) {
+fn generated_type(raw : (Int, Int, Int)) -> (@ajni.JniType, String) {
   let class_name = generated_class_name([raw.1])
   let (base, descriptor) = match positive_mod(raw.0, 9) {
-    0 => (JniType::boolean(), "Z")
-    1 => (JniType::byte(), "B")
-    2 => (JniType::char(), "C")
-    3 => (JniType::short(), "S")
-    4 => (JniType::int(), "I")
-    5 => (JniType::long(), "J")
-    6 => (JniType::float(), "F")
-    7 => (JniType::double(), "D")
+    0 => (@ajni.JniType::boolean(), "Z")
+    1 => (@ajni.JniType::byte(), "B")
+    2 => (@ajni.JniType::char(), "C")
+    3 => (@ajni.JniType::short(), "S")
+    4 => (@ajni.JniType::int(), "I")
+    5 => (@ajni.JniType::long(), "J")
+    6 => (@ajni.JniType::float(), "F")
+    7 => (@ajni.JniType::double(), "D")
     _ => {
-      let class = try! JniClass::parse(class_name)
-      (JniType::object(class), "L\{class_name};")
+      let class = try! @ajni.JniClass::parse(class_name)
+      (@ajni.JniType::object(class), "L\{class_name};")
     }
   }
   let mut value = base
   let mut expected = descriptor
   let depth = positive_mod(raw.2, 8)
   for _ in 0..<depth {
-    value = try! JniType::array(value)
+    value = try! @ajni.JniType::array(value)
     expected = "[" + expected
   }
   (value, expected)
@@ -96,11 +96,11 @@ fn invalid_native_name(raw : (Array[Int], Int)) -> String {
 
 ///|
 fn array_depth_case(depth : Int) -> (Bool, String) {
-  let mut value = JniType::int()
+  let mut value = @ajni.JniType::int()
   let mut expected = "I"
   for _ in 0..<depth {
     try {
-      value = JniType::array(value)
+      value = @ajni.JniType::array(value)
       expected = "[" + expected
     } catch {
       TooManyArrayDimensions => return (false, expected)
@@ -114,22 +114,22 @@ fn array_depth_case(depth : Int) -> (Bool, String) {
 
 ///|
 fn slot_case(raw : Array[Int]) -> (Int, Bool, String, String) {
-  let parameters : Array[JniType] = []
+  let parameters : Array[@ajni.JniType] = []
   let mut slots = 0
   let mut parameter_descriptor = ""
   for value in raw {
     if (value & 1) == 0 {
-      parameters.push(JniType::long())
+      parameters.push(@ajni.JniType::long())
       slots += 2
       parameter_descriptor += "J"
     } else {
-      parameters.push(JniType::int())
+      parameters.push(@ajni.JniType::int())
       slots += 1
       parameter_descriptor += "I"
     }
   }
   let expected = "(" + parameter_descriptor + ")V"
-  try JniMethod::new(parameters[:]) catch {
+  try @ajni.JniMethod::new(parameters[:]) catch {
     TooManyParameterSlots => (slots, false, "", expected)
     _ => (slots, false, "", expected)
   } noraise {
@@ -139,7 +139,7 @@ fn slot_case(raw : Array[Int]) -> (Int, Bool, String, String) {
 
 ///|
 fn method_descriptor_context(input : (Array[(Int, Int, Int)], Int)) -> String {
-  let parameter_values : Array[JniType] = []
+  let parameter_values : Array[@ajni.JniType] = []
   let mut parameter_descriptor = ""
   for raw in input.0 {
     let (value, descriptor) = generated_type(raw)
@@ -151,11 +151,14 @@ fn method_descriptor_context(input : (Array[(Int, Int, Int)], Int)) -> String {
   )
   let (actual_descriptor, expected_return) = match positive_mod(input.1, 3) {
     0 => {
-      let descriptor = (try! JniMethod::new(parameter_values[:])).descriptor()
+      let descriptor = (try! @ajni.JniMethod::new(parameter_values[:])).descriptor()
       (descriptor, "V")
     }
     _ => {
-      let descriptor = (try! JniMethod::new(parameter_values[:], return_type~)).descriptor()
+      let descriptor = (try! @ajni.JniMethod::new(
+        parameter_values[:],
+        return_type~,
+      )).descriptor()
       (descriptor, return_descriptor)
     }
   }
@@ -167,7 +170,7 @@ test "quickcheck: class descriptors preserve generated valid names" {
   @quickcheck.check(
     (raw : Array[Int]) => {
       let name = generated_class_name(raw)
-      let class = try! JniClass::parse(name)
+      let class = try! @ajni.JniClass::parse(name)
       class.internal_name() == name && class.descriptor() == "L" + name + ";"
     },
     count=500,
@@ -181,7 +184,7 @@ test "quickcheck: class descriptors preserve generated valid names" {
 test "quickcheck: method descriptors match an independent type oracle" {
   @quickcheck.check(
     (input : (Array[(Int, Int, Int)], Int)) => {
-      let parameter_values : Array[JniType] = []
+      let parameter_values : Array[@ajni.JniType] = []
       let mut parameter_descriptor = ""
       for raw in input.0 {
         let (value, descriptor) = generated_type(raw)
@@ -191,10 +194,10 @@ test "quickcheck: method descriptors match an independent type oracle" {
       let return_value = generated_type((input.1, input.1 >> 1, input.1 >> 2))
       let (return_type, return_descriptor) = return_value
       let (actual_method, expected_return) = match positive_mod(input.1, 3) {
-        0 => (try! JniMethod::new(parameter_values[:]), "V")
+        0 => (try! @ajni.JniMethod::new(parameter_values[:]), "V")
         _ =>
           (
-            try! JniMethod::new(parameter_values[:], return_type~),
+            try! @ajni.JniMethod::new(parameter_values[:], return_type~),
             return_descriptor,
           )
       }
@@ -214,8 +217,8 @@ test "quickcheck: native declarations preserve valid names and signatures" {
   @quickcheck.check(
     (raw : Array[Int]) => {
       let name = generated_native_name(raw)
-      let signature = try! JniMethod::new([])
-      let declaration = try! NativeMethod::new(name, signature)
+      let signature = try! @ajni.JniMethod::new([])
+      let declaration = try! @ajni.NativeMethod::new(name, signature)
       declaration.name() == name && declaration.descriptor() == "()V"
     },
     count=500,
@@ -229,7 +232,7 @@ test "quickcheck: native declarations preserve valid names and signatures" {
 test "quickcheck: invalid class names are rejected" {
   @quickcheck.check(
     (raw : (Array[Int], Int)) => {
-      try JniClass::parse(invalid_class_name(raw)) catch {
+      try @ajni.JniClass::parse(invalid_class_name(raw)) catch {
         InvalidClassName(_) => true
         _ => false
       } noraise {
@@ -247,8 +250,8 @@ test "quickcheck: invalid class names are rejected" {
 test "quickcheck: invalid native names are rejected" {
   @quickcheck.check(
     (raw : (Array[Int], Int)) => {
-      let signature = try! JniMethod::new([])
-      try NativeMethod::new(invalid_native_name(raw), signature) catch {
+      let signature = try! @ajni.JniMethod::new([])
+      try @ajni.NativeMethod::new(invalid_native_name(raw), signature) catch {
         InvalidNativeMethodName(_) => true
         _ => false
       } noraise {
@@ -296,7 +299,7 @@ test "quickcheck: method parameter slots reject only over-limit inputs" {
 ///|
 test "quickcheck: UTF-8 encode and decode preserve strings" {
   @quickcheck.check(
-    (text : String) => decode_utf8(encode_utf8(text)[:]) == text,
+    (text : String) => @ajni.decode_utf8(@ajni.encode_utf8(text)[:]) == text,
     count=1000,
     max_size=256,
     max_shrinks=100,
@@ -308,8 +311,8 @@ test "quickcheck: UTF-8 encode and decode preserve strings" {
 test "quickcheck: arbitrary byte input is normalized to stable UTF-8" {
   @quickcheck.check(
     (bytes : Bytes) => {
-      let text = decode_utf8(bytes[:])
-      decode_utf8(encode_utf8(text)[:]) == text
+      let text = @ajni.decode_utf8(bytes[:])
+      @ajni.decode_utf8(@ajni.encode_utf8(text)[:]) == text
     },
     count=1000,
     max_size=256,

@@ -8,8 +8,8 @@ installs an unrestricted JavaScript interface.
 ```mbt check
 ///|
 test {
-  let id = install_event_handler(_event => ())
-  remove_event_handler(id)
+  let id = @webview.install_event_handler(_event => ())
+  @webview.remove_event_handler(id)
 }
 ```
 

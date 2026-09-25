@@ -10,12 +10,14 @@ plain MoonBit values.
 ```mbt check
 ///|
 test {
-  let string = try! JniClass::parse("java/lang/String")
-  let signature = try! JniMethod::new(
-    [JniType::object(string)],
-    return_type=JniType::boolean(),
+  let string = try! @ajni.JniClass::parse("java/lang/String")
+  let signature = try! @ajni.JniMethod::new(
+    [@ajni.JniType::object(string)],
+    return_type=@ajni.JniType::boolean(),
   )
-  let registration = try! NativeMethod::new("nativeAcceptsString", signature)
+  let registration = try! @ajni.NativeMethod::new(
+    "nativeAcceptsString", signature,
+  )
   assert_eq(registration.descriptor(), "(Ljava/lang/String;)Z")
 }
 ```

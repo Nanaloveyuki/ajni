@@ -8,8 +8,8 @@ native-owned worker that attaches to ART. It depends on the generic
 ```mbt check
 ///|
 test {
-  let id = install_event_handler(_event => ())
-  remove_event_handler(id)
+  let id = @android.install_event_handler(_event => ())
+  @android.remove_event_handler(id)
 }
 ```
 

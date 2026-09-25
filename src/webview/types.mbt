@@ -19,12 +19,32 @@ pub(all) enum EventKind {
 } derive(Eq, Debug)
 
 ///|
+#deprecated("Use `==` instead", skip_current_package=true)
+#doc(hidden)
+pub extend EventKind with Eq::{equal, not_equal}
+
+///|
+#deprecated("Use `Debug::to_repr` instead", skip_current_package=true)
+#doc(hidden)
+pub extend EventKind with Debug::{to_repr}
+
+///|
 /// The mutually exclusive first document loaded by a newly created WebView.
 pub(all) enum InitialContent {
   Empty
   Url(String)
   Html(String, String)
 } derive(Eq, Debug)
+
+///|
+#deprecated("Use `==` instead", skip_current_package=true)
+#doc(hidden)
+pub extend InitialContent with Eq::{equal, not_equal}
+
+///|
+#deprecated("Use `Debug::to_repr` instead", skip_current_package=true)
+#doc(hidden)
+pub extend InitialContent with Debug::{to_repr}
 
 ///|
 /// Per-view host quotas. Zero disables an individual quota; negative values
@@ -35,6 +55,16 @@ pub struct WebViewResourceLimits {
   max_asset_response_bytes : Int
   asset_response_timeout_millis : Int
 } derive(Eq, Debug)
+
+///|
+#deprecated("Use `==` instead", skip_current_package=true)
+#doc(hidden)
+pub extend WebViewResourceLimits with Eq::{equal, not_equal}
+
+///|
+#deprecated("Use `Debug::to_repr` instead", skip_current_package=true)
+#doc(hidden)
+pub extend WebViewResourceLimits with Debug::{to_repr}
 
 ///|
 pub fn WebViewResourceLimits::new(
@@ -60,6 +90,16 @@ pub struct AssetRequest {
 } derive(Eq, Debug)
 
 ///|
+#deprecated("Use `==` instead", skip_current_package=true)
+#doc(hidden)
+pub extend AssetRequest with Eq::{equal, not_equal}
+
+///|
+#deprecated("Use `Debug::to_repr` instead", skip_current_package=true)
+#doc(hidden)
+pub extend AssetRequest with Debug::{to_repr}
+
+///|
 /// A response header for an embedded asset. Header names and values are passed
 /// as UTF-8 bytes and must not contain transport delimiters.
 pub struct AssetHeader {
@@ -68,8 +108,18 @@ pub struct AssetHeader {
 } derive(Eq, Debug)
 
 ///|
+#deprecated("Use `==` instead", skip_current_package=true)
+#doc(hidden)
+pub extend AssetHeader with Eq::{equal, not_equal}
+
+///|
+#deprecated("Use `Debug::to_repr` instead", skip_current_package=true)
+#doc(hidden)
+pub extend AssetHeader with Debug::{to_repr}
+
+///|
 pub fn AssetHeader::new(name~ : String, value~ : String) -> AssetHeader {
-  { name, value }
+  { name, value, }
 }
 
 ///|
@@ -84,6 +134,16 @@ pub struct AssetResponse {
 } derive(Eq, Debug)
 
 ///|
+#deprecated("Use `==` instead", skip_current_package=true)
+#doc(hidden)
+pub extend AssetResponse with Eq::{equal, not_equal}
+
+///|
+#deprecated("Use `Debug::to_repr` instead", skip_current_package=true)
+#doc(hidden)
+pub extend AssetResponse with Debug::{to_repr}
+
+///|
 pub fn AssetResponse::new(
   status~ : Int,
   mime_type~ : String,
@@ -91,7 +151,7 @@ pub fn AssetResponse::new(
   headers? : Array[AssetHeader] = [],
   body? : Bytes = b"",
 ) -> AssetResponse {
-  { status, mime_type, encoding, headers, body }
+  { status, mime_type, encoding, headers, body, }
 }
 
 ///|
@@ -100,3 +160,13 @@ pub struct Event {
   handle : Int64
   kind : EventKind
 } derive(Eq, Debug)
+
+///|
+#deprecated("Use `==` instead", skip_current_package=true)
+#doc(hidden)
+pub extend Event with Eq::{equal, not_equal}
+
+///|
+#deprecated("Use `Debug::to_repr` instead", skip_current_package=true)
+#doc(hidden)
+pub extend Event with Debug::{to_repr}

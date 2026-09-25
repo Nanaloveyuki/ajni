@@ -9,7 +9,9 @@ fn android_positive_mod(value : Int, modulus : Int) -> Int {
 }
 
 ///|
-fn expected_android_event(input : (Int, Int, Int)) -> (Int, AndroidEvent) {
+fn expected_android_event(
+  input : (Int, Int, Int),
+) -> (Int, @android.AndroidEvent) {
   match android_positive_mod(input.0, 11) {
     0 => (1, Lifecycle(Created))
     1 => (2, Lifecycle(Started))
@@ -30,10 +32,10 @@ test "quickcheck: Android event codes map to the documented event model" {
   @quickcheck.check(
     (input : (Int, Int, Int)) => {
       let (kind, expected) = expected_android_event(input)
-      let events : Array[AndroidEvent] = []
-      let id = install_event_handler(fn(event) { events.push(event) })
-      dispatch_from_android(kind, input.1, input.2)
-      remove_event_handler(id)
+      let events : Array[@android.AndroidEvent] = []
+      let id = @android.install_event_handler(fn(event) { events.push(event) })
+      @android.dispatch_from_android(kind, input.1, input.2)
+      @android.remove_event_handler(id)
       events == [expected]
     },
     count=750,
@@ -47,14 +49,14 @@ test "quickcheck: Android event codes map to the documented event model" {
 test "quickcheck: unknown Android event codes are ignored" {
   @quickcheck.check(
     (input : (Int, Int, Int)) => {
-      let events : Array[AndroidEvent] = []
-      let id = install_event_handler(fn(event) { events.push(event) })
-      dispatch_from_android(
+      let events : Array[@android.AndroidEvent] = []
+      let id = @android.install_event_handler(fn(event) { events.push(event) })
+      @android.dispatch_from_android(
         100 + android_positive_mod(input.0, 1000),
         input.1,
         input.2,
       )
-      remove_event_handler(id)
+      @android.remove_event_handler(id)
       events.length() == 0
     },
     count=500,

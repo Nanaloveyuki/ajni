@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.4
+
+- Pin the project to MoonBit 0.1.20260920 (`moonc` 0.10.14).
+- Keep derived `Eq` and `Debug` methods explicit so newer toolchains do not promote them implicitly.
+
 ## 0.2.3
 
 - Pin the project to MoonBit 0.10.9.

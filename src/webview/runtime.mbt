@@ -304,7 +304,7 @@ pub fn dispatch_from_android(
       }
     _ => return
   }
-  let event = { handle, kind: event_kind }
+  let event = { handle, kind: event_kind, }
   let snapshot : Array[(Event) -> Unit] = []
   for _, handler in handlers {
     snapshot.push(handler)
@@ -346,7 +346,7 @@ fn decode_asset_request(payload : Bytes) -> EventKind? {
     None => return None
   }
   match (fields.get("request_id"), fields.get("path")) {
-    (Some(id), Some(path)) => Some(AssetRequest({ id, path }))
+    (Some(id), Some(path)) => Some(AssetRequest({ id, path, }))
     _ => None
   }
 }
