@@ -41,9 +41,7 @@ pub fn remove_event_handler(id : Int) -> Unit {
 /// Requests a callback on Android's main Looper. The callback is asynchronous
 /// even if the caller is already on the UI thread.
 pub fn post_to_ui() -> Unit raise @ajni.JniError {
-  if native_post_ui_callback() == 0 {
-    raise NotInitialized
-  }
+  check_native_status(native_post_ui_callback())
 }
 
 ///|
@@ -51,8 +49,17 @@ pub fn post_to_ui() -> Unit raise @ajni.JniError {
 /// then posts `WorkerAttached` and `UiTask` to the Android main Looper before
 /// detaching it.
 pub fn start_worker() -> Unit raise @ajni.JniError {
-  if native_start_worker() == 0 {
-    raise NotInitialized
+  check_native_status(native_start_worker())
+}
+
+///|
+fn check_native_status(status : Int) -> Unit raise @ajni.JniError {
+  match status {
+    1 => ()
+    0 => raise NotInitialized
+    -1 => raise RuntimeDestroyed
+    -3 => raise JavaException(@ajni.decode_utf8(native_last_error()))
+    _ => raise NativeFailure(@ajni.decode_utf8(native_last_error()))
   }
 }
 

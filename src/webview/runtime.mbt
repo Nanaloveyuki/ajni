@@ -159,10 +159,7 @@ pub fn set_bounds(
   width : Int,
   height : Int,
 ) -> Unit raise @ajni.JniError {
-  if !@android.runtime_ready() ||
-    native_set_bounds(handle, x, y, width, height) == 0 {
-    raise NotInitialized
-  }
+  check_native_status(native_set_bounds(handle, x, y, width, height))
 }
 
 ///|
@@ -172,15 +169,24 @@ fn command(
   payload : String,
   request_id : String,
 ) -> Unit raise @ajni.JniError {
-  if !@android.runtime_ready() ||
+  check_native_status(
     native_command(
       command,
       handle,
       @ajni.encode_utf8(payload),
       @ajni.encode_utf8(request_id),
-    ) ==
-    0 {
-    raise NotInitialized
+    ),
+  )
+}
+
+///|
+fn check_native_status(status : Int) -> Unit raise @ajni.JniError {
+  match status {
+    1 => ()
+    0 => raise NotInitialized
+    -1 => raise RuntimeDestroyed
+    -3 => raise JavaException(@ajni.decode_utf8(native_last_error()))
+    _ => raise NativeFailure(@ajni.decode_utf8(native_last_error()))
   }
 }
 

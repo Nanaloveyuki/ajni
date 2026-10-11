@@ -1,6 +1,6 @@
 import {
   "Nanaloveyuki/ajni",
-  "Nanaloveyuki/ajni/android",
+  "Nanaloveyuki/ajni/android", // Required native linkage for shared lease/error symbols.
   "moonbitlang/core/encoding/base64",
   "moonbitlang/core/encoding/utf8",
 }

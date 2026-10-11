@@ -12,10 +12,17 @@ public MoonBit APIs, Android API levels, or the feature split before starting
 implementation. Focused fixes, tests, and documentation improvements can be
 proposed directly.
 
+Until MoonBit 1.0 is officially released, work is limited to bug fixes in
+existing behavior, build correctness, and documentation. Do not add general
+JNI APIs, binding generators, new platform/ABI support, or additional WebView
+features. Use [BUGFIX_PLAN.md](BUGFIX_PLAN.md) to track defect evidence and
+static acceptance criteria; reconsider feature expansion after 1.0.
+
 ## Development Setup
 
-Install MoonBit and Java 17. Android build work additionally needs Android SDK
-platform tools, NDK `29.0.14206865`, CMake `4.1.2`, and Gradle `8.10.2`.
+Install the MoonBit version in `.moon-version` and Java 17. Android build work
+additionally needs Android SDK platform 35, platform tools, NDK `29.0.14206865`,
+CMake `4.1.2`, and the bundled Gradle `8.10.2` wrapper.
 
 Set `ANDROID_NDK_HOME` when the NDK is not discoverable through Android Studio:
 
@@ -42,24 +49,30 @@ the core-only build path.
 
 ## Validate Changes
 
-Run the narrowest relevant checks first, then the shared validation chain:
+The current validation scope is static checking; Android/WebView runtime tests
+are deferred. Run:
 
 ```powershell
 moon fmt --check
 moon check --target native
-moon test --target native -v
+moon test --target native --build-only
+moon info --target native
 ```
 
-For Android JNI, Kotlin host, CMake, or ABI changes, build the demo:
+For Android JNI, Kotlin host, CMake, or ABI fixes, compile the demo only when
+the required SDK/NDK/build tools are available; do not treat compilation as a
+platform runtime test:
 
 ```powershell
 .\scripts\build-android.ps1
 ```
 
-Run Android instrumentation tests on an emulator or device when a change
-affects `WebView`, UI-thread delivery, Activity/container teardown, JNI UTF-16
-conversion, or Surface behavior. GitHub Actions builds the Android demo for
-`arm64-v8a` and `x86_64` on every pull request.
+Do not require device/emulator instrumentation, WebView UI smoke, or checked-JVM
+runtime scenarios during this maintenance period. Compile existing tests without
+executing them. Non-Android operations report unsupported failures, not simulated
+ART/WebView success. Record static checks and compilation separately from deferred
+runtime verification. GitHub Actions compiles Android and instrumented-test
+sources, builds `arm64-v8a` and `x86_64`, and runs static lint without devices.
 
 Update `README.md`, package `README.mbt.md` files, generated public interfaces,
 and tests whenever observable behavior changes. Do not commit `_build`,

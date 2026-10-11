@@ -14,7 +14,10 @@ else()
 endif()
 
 find_program(MOON_EXECUTABLE moon REQUIRED)
-set(MOONBIT_HOST_SOURCE "${AJNI_ROOT}/_build/native/release/build/android_runtime/android_runtime.c")
+# Each ABI/configuration has its own MoonBit build graph and generated C file.
+# Gradle can schedule ABI builds in parallel without sharing MoonBit's lock/output.
+set(AJNI_MOONBIT_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/moonbit")
+set(MOONBIT_HOST_SOURCE "${AJNI_MOONBIT_TARGET_DIR}/native/release/build/android_runtime/android_runtime.c")
 set(MOONBIT_RUNTIME_SOURCES
   "${MOON_HOME}/lib/runtime/runtime.c"
   "${MOON_HOME}/lib/runtime/utf.c"
@@ -33,26 +36,77 @@ if(NOT EXISTS "${MOONBIT_RUNTIME_SOURCE}")
   message(FATAL_ERROR "MoonBit runtime was not found under ${MOON_HOME}. Set MOON_HOME before building.")
 endif()
 
+# CONFIGURE_DEPENDS also refreshes the input list when a source/package is added
+# or removed. Include all package/module settings, native stubs and headers;
+# a hand-maintained list misses imported packages and transitive C includes.
+file(GLOB_RECURSE AJNI_SOURCE_INPUTS CONFIGURE_DEPENDS
+  "${AJNI_ROOT}/src/*.mbt"
+  "${AJNI_ROOT}/src/*.mbt.md"
+  "${AJNI_ROOT}/src/*.c"
+  "${AJNI_ROOT}/src/*.h"
+  "${AJNI_ROOT}/src/moon.pkg"
+  "${AJNI_ROOT}/src/moon.pkg.json"
+)
+file(GLOB AJNI_MODULE_INPUTS CONFIGURE_DEPENDS
+  "${AJNI_ROOT}/moon.mod"
+  "${AJNI_ROOT}/moon.mod.json"
+  "${AJNI_ROOT}/moon.lock"
+  "${AJNI_ROOT}/moon.lock.json"
+  "${AJNI_ROOT}/.moon-version"
+)
+file(GLOB_RECURSE AJNI_DEPENDENCY_INPUTS CONFIGURE_DEPENDS
+  "${AJNI_ROOT}/.mooncakes/*.mbt"
+  "${AJNI_ROOT}/.mooncakes/*.mbt.md"
+  "${AJNI_ROOT}/.mooncakes/*.c"
+  "${AJNI_ROOT}/.mooncakes/*.h"
+  "${AJNI_ROOT}/.mooncakes/*.mi"
+  "${AJNI_ROOT}/.mooncakes/*.core"
+  "${AJNI_ROOT}/.mooncakes/*.o"
+  "${AJNI_ROOT}/.mooncakes/*.a"
+  "${AJNI_ROOT}/.mooncakes/moon.pkg"
+  "${AJNI_ROOT}/.mooncakes/moon.pkg.json"
+  "${AJNI_ROOT}/.mooncakes/moon.mod"
+  "${AJNI_ROOT}/.mooncakes/moon.mod.json"
+)
+file(GLOB_RECURSE MOONBIT_TOOLCHAIN_INPUTS CONFIGURE_DEPENDS
+  "${MOON_HOME}/include/*.h"
+  "${MOON_HOME}/lib/core/*.mbt"
+  "${MOON_HOME}/lib/core/_build/native/release/bundle/*.mi"
+  "${MOON_HOME}/lib/core/_build/native/release/bundle/*.core"
+  "${MOON_HOME}/lib/runtime/*.h"
+  "${MOON_HOME}/lib/core/moon.pkg"
+  "${MOON_HOME}/lib/core/moon.pkg.json"
+  "${MOON_HOME}/lib/core/moon.mod"
+  "${MOON_HOME}/lib/core/moon.mod.json"
+)
+file(GLOB MOONBIT_COMPILER_INPUTS CONFIGURE_DEPENDS
+  "${MOON_HOME}/bin/moonc"
+  "${MOON_HOME}/bin/moonc.exe"
+)
+# Changing the dependency set itself (including removals) must invalidate C.
+# file(CONFIGURE) updates this manifest only when its content changes.
+set(AJNI_MOONBIT_INPUT_MANIFEST "${CMAKE_CURRENT_BINARY_DIR}/moonbit-inputs.txt")
+file(CONFIGURE OUTPUT "${AJNI_MOONBIT_INPUT_MANIFEST}"
+  CONTENT "${AJNI_SOURCE_INPUTS}\n${AJNI_MODULE_INPUTS}\n${AJNI_DEPENDENCY_INPUTS}\n${MOONBIT_TOOLCHAIN_INPUTS}\n${MOONBIT_COMPILER_INPUTS}\n"
+  @ONLY
+)
+
 add_custom_command(
   OUTPUT "${MOONBIT_HOST_SOURCE}"
-  COMMAND "${MOON_EXECUTABLE}" build --target native --release src/android_runtime
+  COMMAND "${MOON_EXECUTABLE}" build --target native --release
+    --target-dir "${AJNI_MOONBIT_TARGET_DIR}" src/android_runtime
   WORKING_DIRECTORY "${AJNI_ROOT}"
   DEPENDS
-    "${AJNI_BRIDGE_SOURCE}"
-    "${AJNI_ROOT}/src/android_runtime/main.mbt"
-    "${AJNI_ROOT}/src/android_runtime/moon.pkg"
-    "${AJNI_ROOT}/src/android/runtime.mbt"
-    "${AJNI_ROOT}/src/android/types.mbt"
-    "${AJNI_ROOT}/src/types.mbt"
-    "${AJNI_ROOT}/src/android/ffi.mbt"
-    "${AJNI_ROOT}/src/webview/runtime.mbt"
-    "${AJNI_ROOT}/src/webview/types.mbt"
-    "${AJNI_ROOT}/src/webview/ffi.mbt"
-    "${AJNI_ROOT}/src/webview/moon.pkg"
-  "${AJNI_WEBVIEW_BRIDGE_SOURCE}"
-  "${AJNI_ROOT}/src/android/android_compat.h"
-  ${MOONBIT_RUNTIME_SOURCES}
-  COMMENT "Generating MoonBit Android runtime source"
+    "${AJNI_MOONBIT_INPUT_MANIFEST}"
+    "${CMAKE_CURRENT_LIST_FILE}"
+    ${AJNI_SOURCE_INPUTS}
+    ${AJNI_MODULE_INPUTS}
+    ${AJNI_DEPENDENCY_INPUTS}
+    ${MOONBIT_TOOLCHAIN_INPUTS}
+    ${MOONBIT_COMPILER_INPUTS}
+    "${MOON_EXECUTABLE}"
+    ${MOONBIT_RUNTIME_SOURCES}
+  COMMENT "Generating MoonBit Android runtime source for ${ANDROID_ABI}"
   VERBATIM
 )
 add_custom_target(generate_moonbit_android_runtime DEPENDS "${MOONBIT_HOST_SOURCE}")

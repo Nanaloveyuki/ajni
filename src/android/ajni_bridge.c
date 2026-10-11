@@ -9,6 +9,35 @@ static void moonbit_decref(void *value) { (void)value; }
 #include <moonbit.h>
 #endif
 
+#include <stdio.h>
+#include <string.h>
+#include "ajni_android_internal.h"
+
+static _Thread_local int32_t g_error_status = AJNI_OK;
+static _Thread_local char g_error_message[1024];
+
+void ajni_reset_error(void) {
+  g_error_status = AJNI_OK;
+  g_error_message[0] = '\0';
+}
+
+int32_t ajni_set_error(int32_t status, const char *message) {
+  g_error_status = status;
+  snprintf(g_error_message, sizeof(g_error_message), "%s", message);
+  return status;
+}
+
+int32_t ajni_error_status(void) { return g_error_status; }
+
+#if !defined(AJNI_STANDALONE_JNI)
+MOONBIT_FFI_EXPORT moonbit_bytes_t ajni_last_error(void) {
+  size_t length = strlen(g_error_message);
+  moonbit_bytes_t bytes = moonbit_make_bytes((int32_t)length, 0);
+  if (length != 0) memcpy(bytes, g_error_message, length);
+  return bytes;
+}
+#endif
+
 #if defined(__ANDROID__)
 #include <stdbool.h>
 #include <stddef.h>
@@ -121,7 +150,6 @@ MOONBIT_FFI_EXPORT void ajni_emit_for_test(
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include "ajni_android_internal.h"
 
 #define AJNI_LOG_TAG "ajni"
 #define AJNI_LOGE(...) __android_log_print(ANDROID_LOG_ERROR, AJNI_LOG_TAG, __VA_ARGS__)
@@ -148,6 +176,8 @@ static ANativeWindow *g_window = NULL;
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t g_idle = PTHREAD_COND_INITIALIZER;
 bool g_initialized = false;
+static bool g_was_initialized = false;
+static int64_t g_runtime_generation = 0;
 static size_t g_active_workers = 0;
 static size_t g_active_bridge_calls = 0;
 #if defined(AJNI_USE_MOONBIT_EXPORTS)
@@ -187,13 +217,46 @@ int getentropy(void *buffer, size_t length) {
 }
 #endif
 
+void ajni_throw_new(JNIEnv *env, const char *class_name, const char *message) {
+  if ((*env)->ExceptionCheck(env)) return;
+  jclass exception_class = (*env)->FindClass(env, class_name);
+  if (exception_class == NULL) return;
+  if (!(*env)->ExceptionCheck(env)) (*env)->ThrowNew(env, exception_class, message);
+  (*env)->DeleteLocalRef(env, exception_class);
+}
+
 bool ajni_check_exception(JNIEnv *env, const char *operation) {
-  if (!(*env)->ExceptionCheck(env)) {
-    return true;
-  }
-  (*env)->ExceptionDescribe(env);
+  if (!(*env)->ExceptionCheck(env)) return true;
+  jthrowable exception = (*env)->ExceptionOccurred(env);
   (*env)->ExceptionClear(env);
-  AJNI_LOGE("Java exception during %s", operation);
+  ajni_set_error(AJNI_JAVA_EXCEPTION, operation);
+  jclass exception_class = NULL;
+  jstring description = NULL;
+  char *message = NULL;
+  if (exception != NULL) {
+    exception_class = (*env)->GetObjectClass(env, exception);
+    if (!(*env)->ExceptionCheck(env) && exception_class != NULL) {
+      jmethodID to_string = (*env)->GetMethodID(env, exception_class, "toString", "()Ljava/lang/String;");
+      if (!(*env)->ExceptionCheck(env) && to_string != NULL) {
+        description = (jstring)(*env)->CallObjectMethod(env, exception, to_string);
+        if (!(*env)->ExceptionCheck(env) && description != NULL) {
+          size_t length = 0;
+          message = ajni_utf8_from_string(env, description, &length);
+          if (message != NULL && !(*env)->ExceptionCheck(env)) {
+            snprintf(g_error_message, sizeof(g_error_message), "%s: %.*s", operation,
+                     (int)(length < sizeof(g_error_message) ? length : sizeof(g_error_message) - 1), message);
+          }
+        }
+      }
+    }
+  }
+  if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+  free(message);
+  if (description != NULL) (*env)->DeleteLocalRef(env, description);
+  if (exception_class != NULL) (*env)->DeleteLocalRef(env, exception_class);
+  if (exception != NULL) (*env)->DeleteLocalRef(env, exception);
+  g_error_status = AJNI_JAVA_EXCEPTION;
+  AJNI_LOGE("%s", g_error_message);
   return false;
 }
 
@@ -204,40 +267,45 @@ static void ajni_release_window_locked(void) {
   }
 }
 
-bool ajni_bridge_lease_acquire(AjniBridgeLease *lease) {
+int32_t ajni_bridge_lease_acquire(AjniBridgeLease *lease) {
   memset(lease, 0, sizeof(*lease));
   pthread_mutex_lock(&g_lock);
   if (!g_initialized || g_vm == NULL || g_bridge_class == NULL) {
+    int32_t status = g_was_initialized ? AJNI_RUNTIME_DESTROYED : AJNI_NOT_INITIALIZED;
     pthread_mutex_unlock(&g_lock);
-    return false;
+    return ajni_set_error(status, "Android runtime is not ready");
   }
   lease->vm = g_vm;
+  lease->runtime_generation = g_runtime_generation;
   ++g_active_bridge_calls;
   pthread_mutex_unlock(&g_lock);
 
-  if ((*lease->vm)->GetEnv(lease->vm, (void **)&lease->env, JNI_VERSION_1_6) == JNI_EDETACHED) {
-    if ((*lease->vm)->AttachCurrentThread(lease->vm, &lease->env, NULL) != JNI_OK || lease->env == NULL) {
-      pthread_mutex_lock(&g_lock);
-      --g_active_bridge_calls;
-      pthread_cond_broadcast(&g_idle);
-      pthread_mutex_unlock(&g_lock);
-      return false;
-    }
-    lease->attached = true;
+  jint result = (*lease->vm)->GetEnv(lease->vm, (void **)&lease->env, JNI_VERSION_1_6);
+  if (result == JNI_EDETACHED) {
+    result = (*lease->vm)->AttachCurrentThread(lease->vm, (void **)&lease->env, NULL);
+    if (result == JNI_OK) lease->attached = true;
   }
-  if (lease->env == NULL) {
+  if (result != JNI_OK || lease->env == NULL) {
+    ajni_set_error(AJNI_NATIVE_FAILURE, "Could not attach current thread to JavaVM");
     ajni_bridge_lease_release(lease);
-    return false;
+    return AJNI_NATIVE_FAILURE;
   }
-
+  if ((*lease->env)->ExceptionCheck(lease->env)) {
+    ajni_set_error(AJNI_JAVA_EXCEPTION, "JNI entry already has a pending Java exception");
+    ajni_bridge_lease_release(lease);
+    return AJNI_JAVA_EXCEPTION;
+  }
   pthread_mutex_lock(&g_lock);
-  lease->bridge_class = g_bridge_class == NULL ? NULL : (*lease->env)->NewLocalRef(lease->env, g_bridge_class);
+  lease->bridge_class = (jclass)(*lease->env)->NewLocalRef(lease->env, g_bridge_class);
   pthread_mutex_unlock(&g_lock);
-  if (lease->bridge_class == NULL || !ajni_check_exception(lease->env, "NewLocalRef(NativeBridge)")) {
+  bool exception_free = ajni_check_exception(lease->env, "NewLocalRef(NativeBridge)");
+  if (!exception_free || lease->bridge_class == NULL) {
+    if (exception_free) ajni_set_error(AJNI_NATIVE_FAILURE, "Could not retain NativeBridge class");
+    int32_t status = ajni_error_status();
     ajni_bridge_lease_release(lease);
-    return false;
+    return status;
   }
-  return true;
+  return AJNI_OK;
 }
 
 void ajni_bridge_lease_release(AjniBridgeLease *lease) {
@@ -256,14 +324,18 @@ void ajni_bridge_lease_release(AjniBridgeLease *lease) {
   memset(lease, 0, sizeof(*lease));
 }
 
-static bool ajni_enqueue_ui_callback(AjniBridgeLease *lease, jint event_kind) {
-  jmethodID post = (*lease->env)->GetStaticMethodID(lease->env, lease->bridge_class, "postUiCallback", "(I)Z");
-  if (post == NULL) {
-    ajni_check_exception(lease->env, "NativeBridge.postUiCallback");
-    return false;
-  }
-  jboolean queued = (*lease->env)->CallStaticBooleanMethod(lease->env, lease->bridge_class, post, event_kind);
-  return queued == JNI_TRUE && ajni_check_exception(lease->env, "NativeBridge.postUiCallback");
+static int32_t ajni_enqueue_ui_callback(AjniBridgeLease *lease, jint event_kind) {
+  jmethodID post = (*lease->env)->GetStaticMethodID(lease->env, lease->bridge_class,
+                                                   "postUiCallbackForRuntime", "(IJ)Z");
+  bool exception_free = ajni_check_exception(lease->env, "NativeBridge.postUiCallbackForRuntime lookup");
+  if (!exception_free) return AJNI_JAVA_EXCEPTION;
+  if (post == NULL) return ajni_set_error(AJNI_NATIVE_FAILURE, "UI callback method was not found");
+  jboolean queued = (*lease->env)->CallStaticBooleanMethod(lease->env, lease->bridge_class,
+                                                          post, event_kind, (jlong)lease->runtime_generation);
+  exception_free = ajni_check_exception(lease->env, "NativeBridge.postUiCallbackForRuntime");
+  if (!exception_free) return AJNI_JAVA_EXCEPTION;
+  if (queued != JNI_TRUE) return ajni_set_error(AJNI_NATIVE_FAILURE, "UI callback was rejected");
+  return AJNI_OK;
 }
 
 static void ajni_draw_window_locked(uint32_t color) {
@@ -305,10 +377,12 @@ static void ajni_draw_window_locked(uint32_t color) {
 jstring ajni_string_from_utf8(JNIEnv *env, const char *text, size_t length) {
   if (env == NULL || (text == NULL && length != 0) || length > INT32_MAX ||
       length > (SIZE_MAX / sizeof(jchar)) - 1) {
+    ajni_set_error(AJNI_NATIVE_FAILURE, "Invalid UTF-8 buffer length");
     return NULL;
   }
   jchar *utf16 = (jchar *)calloc(length + 1, sizeof(jchar));
   if (utf16 == NULL) {
+    ajni_set_error(AJNI_NATIVE_FAILURE, "Could not allocate UTF-16 buffer");
     return NULL;
   }
   size_t out = 0;
@@ -317,16 +391,20 @@ jstring ajni_string_from_utf8(JNIEnv *env, const char *text, size_t length) {
     uint32_t codepoint = 0xFFFD;
     if (byte < 0x80) {
       codepoint = byte;
-    } else if ((byte & 0xE0) == 0xC0 && i < length && ((unsigned char)text[i] & 0xC0) == 0x80) {
+    } else if (byte >= 0xC2 && byte <= 0xDF && i < length && ((unsigned char)text[i] & 0xC0) == 0x80) {
       codepoint = ((byte & 0x1F) << 6) | ((unsigned char)text[i++] & 0x3F);
-    } else if ((byte & 0xF0) == 0xE0 && i + 1 < length &&
-               ((unsigned char)text[i] & 0xC0) == 0x80 && ((unsigned char)text[i + 1] & 0xC0) == 0x80) {
+    } else if (byte >= 0xE0 && byte <= 0xEF && length - i >= 2 &&
+               ((unsigned char)text[i] & 0xC0) == 0x80 && ((unsigned char)text[i + 1] & 0xC0) == 0x80 &&
+               (byte != 0xE0 || (unsigned char)text[i] >= 0xA0) &&
+               (byte != 0xED || (unsigned char)text[i] < 0xA0)) {
       codepoint = ((byte & 0x0F) << 12) | (((unsigned char)text[i] & 0x3F) << 6) |
                   ((unsigned char)text[i + 1] & 0x3F);
       i += 2;
-    } else if ((byte & 0xF8) == 0xF0 && i + 2 < length &&
+    } else if (byte >= 0xF0 && byte <= 0xF4 && length - i >= 3 &&
                ((unsigned char)text[i] & 0xC0) == 0x80 && ((unsigned char)text[i + 1] & 0xC0) == 0x80 &&
-               ((unsigned char)text[i + 2] & 0xC0) == 0x80) {
+               ((unsigned char)text[i + 2] & 0xC0) == 0x80 &&
+               (byte != 0xF0 || (unsigned char)text[i] >= 0x90) &&
+               (byte != 0xF4 || (unsigned char)text[i] < 0x90)) {
       codepoint = ((byte & 0x07) << 18) | (((unsigned char)text[i] & 0x3F) << 12) |
                   (((unsigned char)text[i + 1] & 0x3F) << 6) | ((unsigned char)text[i + 2] & 0x3F);
       i += 3;
@@ -352,15 +430,18 @@ char *ajni_utf8_from_string(JNIEnv *env, jstring text, size_t *out_length) {
   }
   *out_length = 0;
   jsize length = (*env)->GetStringLength(env, text);
+  if ((*env)->ExceptionCheck(env)) return NULL;
   if (length < 0 || (size_t)length > (SIZE_MAX - 1) / 3) {
     return NULL;
   }
   const jchar *chars = (*env)->GetStringChars(env, text, NULL);
-  if (chars == NULL || !ajni_check_exception(env, "GetStringChars")) {
+  if ((*env)->ExceptionCheck(env) || chars == NULL) {
+    if (chars != NULL) (*env)->ReleaseStringChars(env, text, chars);
     return NULL;
   }
   char *output = (char *)malloc((size_t)length * 3 + 1);
   if (output == NULL) {
+    ajni_set_error(AJNI_NATIVE_FAILURE, "Could not allocate UTF-8 buffer");
     (*env)->ReleaseStringChars(env, text, chars);
     return NULL;
   }
@@ -404,45 +485,49 @@ static jstring ajni_native_echo(JNIEnv *env, jclass unused, jstring text) {
   }
   size_t length = 0;
   char *utf8 = ajni_utf8_from_string(env, text, &length);
-  if (utf8 == NULL) return NULL;
+  if (utf8 == NULL) {
+    ajni_throw_new(env, "java/lang/OutOfMemoryError", "Could not convert Java string");
+    return NULL;
+  }
   jstring result = ajni_string_from_utf8(env, utf8, length);
   free(utf8);
-  ajni_check_exception(env, "NewString");
+  if (result == NULL) ajni_throw_new(env, "java/lang/OutOfMemoryError", "Could not allocate Java string");
   return result;
 }
 
-static void ajni_native_initialize(JNIEnv *env, jclass unused, jobject context) {
+static void ajni_native_initialize(JNIEnv *env, jclass unused, jobject context, jlong generation) {
   (void)unused;
-  if (context == NULL) {
-    (*env)->ThrowNew(env, "java/lang/IllegalArgumentException", "context must not be null");
+  if ((*env)->ExceptionCheck(env)) return;
+  if (context == NULL || generation <= 0) {
+    ajni_throw_new(env, "java/lang/IllegalArgumentException", "context and runtime generation must be valid");
     return;
   }
   jclass context_class = (*env)->GetObjectClass(env, context);
-  if (context_class == NULL || !ajni_check_exception(env, "GetObjectClass(Context)")) {
-    return;
-  }
+  jobject loader = NULL;
+  jobject global_loader = NULL;
+  if ((*env)->ExceptionCheck(env) || context_class == NULL) goto failure;
   jmethodID get_loader = (*env)->GetMethodID(env, context_class, "getClassLoader", "()Ljava/lang/ClassLoader;");
-  if (get_loader == NULL || !ajni_check_exception(env, "Context.getClassLoader")) {
-    (*env)->DeleteLocalRef(env, context_class);
-    return;
-  }
-  jobject loader = get_loader == NULL ? NULL : (*env)->CallObjectMethod(env, context, get_loader);
-  if (loader == NULL || !ajni_check_exception(env, "Context.getClassLoader")) {
-    (*env)->DeleteLocalRef(env, context_class);
-    return;
-  }
-  jobject global_loader = (*env)->NewGlobalRef(env, loader);
-  (*env)->DeleteLocalRef(env, loader);
-  (*env)->DeleteLocalRef(env, context_class);
-  if (global_loader == NULL || !ajni_check_exception(env, "NewGlobalRef(ClassLoader)")) {
-    return;
-  }
+  if ((*env)->ExceptionCheck(env) || get_loader == NULL) goto failure;
+  loader = (*env)->CallObjectMethod(env, context, get_loader);
+  if ((*env)->ExceptionCheck(env) || loader == NULL) goto failure;
+  global_loader = (*env)->NewGlobalRef(env, loader);
+  if ((*env)->ExceptionCheck(env) || global_loader == NULL) goto failure;
   pthread_mutex_lock(&g_lock);
   jobject old_loader = g_class_loader;
   g_class_loader = global_loader;
+  g_runtime_generation = generation;
+  g_was_initialized = true;
   g_initialized = true;
   pthread_mutex_unlock(&g_lock);
   if (old_loader != NULL) (*env)->DeleteGlobalRef(env, old_loader);
+  (*env)->DeleteLocalRef(env, loader);
+  (*env)->DeleteLocalRef(env, context_class);
+  return;
+failure:
+  if (global_loader != NULL) (*env)->DeleteGlobalRef(env, global_loader);
+  if (loader != NULL) (*env)->DeleteLocalRef(env, loader);
+  if (context_class != NULL) (*env)->DeleteLocalRef(env, context_class);
+  ajni_throw_new(env, "java/lang/IllegalStateException", "Could not initialize Android class loader");
 }
 
 static void ajni_native_shutdown(JNIEnv *env, jclass unused) {
@@ -454,6 +539,7 @@ static void ajni_native_shutdown(JNIEnv *env, jclass unused) {
     g_class_loader = NULL;
   }
   g_initialized = false;
+  g_runtime_generation = 0;
   pthread_mutex_unlock(&g_lock);
 }
 
@@ -467,8 +553,9 @@ static void ajni_native_surface_created(JNIEnv *env, jclass unused, jobject surf
   (void)unused;
   if (surface == NULL) return;
   ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
-  if (window == NULL || !ajni_check_exception(env, "ANativeWindow_fromSurface")) {
-    AJNI_LOGE("ANativeWindow_fromSurface failed");
+  if ((*env)->ExceptionCheck(env) || window == NULL) {
+    if (window != NULL) ANativeWindow_release(window);
+    ajni_throw_new(env, "java/lang/IllegalStateException", "ANativeWindow_fromSurface failed");
     return;
   }
   pthread_mutex_lock(&g_lock);
@@ -513,12 +600,14 @@ static void ajni_native_on_ui_task(JNIEnv *env, jclass unused, jint event_kind) 
   ajni_emit(AJNI_UI_TASK, 0, 0);
 }
 
-static void *ajni_worker_main(void *unused) {
-  (void)unused;
+static void *ajni_worker_main(void *context) {
+  int64_t generation = *(int64_t *)context;
+  free(context);
+  ajni_reset_error();
   AjniBridgeLease lease;
-  if (ajni_bridge_lease_acquire(&lease)) {
-    AJNI_LOGI("native worker attached to JavaVM");
-    if (ajni_enqueue_ui_callback(&lease, AJNI_WORKER_ATTACHED)) {
+  if (ajni_bridge_lease_acquire(&lease) == AJNI_OK) {
+    if (lease.runtime_generation == generation &&
+        ajni_enqueue_ui_callback(&lease, AJNI_WORKER_ATTACHED) == AJNI_OK) {
       AJNI_LOGI("native worker posted UI callback");
     }
     ajni_bridge_lease_release(&lease);
@@ -530,24 +619,42 @@ static void *ajni_worker_main(void *unused) {
   return NULL;
 }
 
-static bool ajni_start_worker_locked(void) {
-  if (!g_initialized || g_vm == NULL || g_bridge_class == NULL) return false;
-  ++g_active_workers;
-  pthread_t thread;
-  if (pthread_create(&thread, NULL, ajni_worker_main, NULL) == 0) {
-    pthread_detach(thread);
-    return true;
+static int32_t ajni_start_worker_locked(void) {
+  if (!g_initialized || g_vm == NULL || g_bridge_class == NULL) {
+    return ajni_set_error(g_was_initialized ? AJNI_RUNTIME_DESTROYED : AJNI_NOT_INITIALIZED,
+                          "Android runtime is not ready");
   }
-  --g_active_workers;
-  return false;
+  int64_t *generation = malloc(sizeof(*generation));
+  if (generation == NULL) return ajni_set_error(AJNI_NATIVE_FAILURE, "Could not allocate worker context");
+  *generation = g_runtime_generation;
+  pthread_attr_t attributes;
+  int result = pthread_attr_init(&attributes);
+  if (result != 0) {
+    free(generation);
+    return ajni_set_error(AJNI_NATIVE_FAILURE, "Could not initialize worker attributes");
+  }
+  result = pthread_attr_setdetachstate(&attributes, PTHREAD_CREATE_DETACHED);
+  if (result == 0) {
+    ++g_active_workers;
+    pthread_t thread;
+    result = pthread_create(&thread, &attributes, ajni_worker_main, generation);
+    if (result != 0) --g_active_workers;
+  }
+  pthread_attr_destroy(&attributes);
+  if (result != 0) {
+    free(generation);
+    return ajni_set_error(AJNI_NATIVE_FAILURE, "Could not create native worker");
+  }
+  return AJNI_OK;
 }
 
 static void ajni_native_start_worker(JNIEnv *env, jclass unused) {
   (void)unused;
+  ajni_reset_error();
   pthread_mutex_lock(&g_lock);
-  bool started = ajni_start_worker_locked();
+  int32_t status = ajni_start_worker_locked();
   pthread_mutex_unlock(&g_lock);
-  if (!started) (*env)->ThrowNew(env, "java/lang/IllegalStateException", "could not start native worker");
+  if (status != AJNI_OK) ajni_throw_new(env, "java/lang/IllegalStateException", g_error_message);
 }
 
 MOONBIT_FFI_EXPORT int32_t ajni_runtime_ready(void) {
@@ -557,17 +664,20 @@ MOONBIT_FFI_EXPORT int32_t ajni_runtime_ready(void) {
   return ready;
 }
 MOONBIT_FFI_EXPORT int32_t ajni_post_ui_callback(void) {
+  ajni_reset_error();
   AjniBridgeLease lease;
-  if (!ajni_bridge_lease_acquire(&lease)) return 0;
-  int ok = ajni_enqueue_ui_callback(&lease, AJNI_UI_TASK);
+  int32_t status = ajni_bridge_lease_acquire(&lease);
+  if (status != AJNI_OK) return status;
+  status = ajni_enqueue_ui_callback(&lease, AJNI_UI_TASK);
   ajni_bridge_lease_release(&lease);
-  return ok ? 1 : 0;
+  return status;
 }
 MOONBIT_FFI_EXPORT int32_t ajni_start_worker(void) {
+  ajni_reset_error();
   pthread_mutex_lock(&g_lock);
-  int32_t started = ajni_start_worker_locked() ? 1 : 0;
+  int32_t status = ajni_start_worker_locked();
   pthread_mutex_unlock(&g_lock);
-  return started;
+  return status;
 }
 
 JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *unused) {
@@ -581,9 +691,9 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *unused) {
   ajni_initialize_moonbit();
 #endif
   jclass local_class = (*env)->FindClass(env, "dev/nanaloveyuki/ajni/host/NativeBridge");
-  if (local_class == NULL || !ajni_check_exception(env, "FindClass(NativeBridge)")) return JNI_ERR;
+  if ((*env)->ExceptionCheck(env) || local_class == NULL) return JNI_ERR;
   const JNINativeMethod methods[] = {
-      {"nativeInitialize", "(Landroid/content/Context;)V", (void *)ajni_native_initialize},
+      {"nativeInitialize", "(Landroid/content/Context;J)V", (void *)ajni_native_initialize},
       {"nativeShutdown", "()V", (void *)ajni_native_shutdown},
       {"nativeLifecycle", "(I)V", (void *)ajni_native_lifecycle},
       {"nativeSurfaceCreated", "(Landroid/view/Surface;II)V", (void *)ajni_native_surface_created},
@@ -593,8 +703,8 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *unused) {
       {"nativeStartWorker", "()V", (void *)ajni_native_start_worker},
       {"nativeEcho", "(Ljava/lang/String;)Ljava/lang/String;", (void *)ajni_native_echo},
   };
-  if ((*env)->RegisterNatives(env, local_class, methods, sizeof(methods) / sizeof(methods[0])) != JNI_OK ||
-      !ajni_check_exception(env, "RegisterNatives")) {
+  jint registration = (*env)->RegisterNatives(env, local_class, methods, sizeof(methods) / sizeof(methods[0]));
+  if ((*env)->ExceptionCheck(env) || registration != JNI_OK) {
     (*env)->DeleteLocalRef(env, local_class);
     return JNI_ERR;
   }
@@ -606,7 +716,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *unused) {
 #endif
   jclass bridge_class = (jclass)(*env)->NewGlobalRef(env, local_class);
   (*env)->DeleteLocalRef(env, local_class);
-  if (bridge_class == NULL) return JNI_ERR;
+  if ((*env)->ExceptionCheck(env) || bridge_class == NULL) return JNI_ERR;
   pthread_mutex_lock(&g_lock);
   g_bridge_class = bridge_class;
   pthread_mutex_unlock(&g_lock);
@@ -642,8 +752,12 @@ JNIEXPORT void JNI_OnUnload(JavaVM *vm, void *unused) {
 
 #else
 
-MOONBIT_FFI_EXPORT int32_t ajni_runtime_ready(void) { return 1; }
-MOONBIT_FFI_EXPORT int32_t ajni_post_ui_callback(void) { return 1; }
-MOONBIT_FFI_EXPORT int32_t ajni_start_worker(void) { return 1; }
+MOONBIT_FFI_EXPORT int32_t ajni_runtime_ready(void) { return 0; }
+MOONBIT_FFI_EXPORT int32_t ajni_post_ui_callback(void) {
+  return ajni_set_error(AJNI_UNSUPPORTED, "Android UI callbacks are unsupported on this platform");
+}
+MOONBIT_FFI_EXPORT int32_t ajni_start_worker(void) {
+  return ajni_set_error(AJNI_UNSUPPORTED, "Android workers are unsupported on this platform");
+}
 
 #endif

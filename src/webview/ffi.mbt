@@ -15,3 +15,6 @@ extern "C" fn native_set_bounds(
   width : Int,
   height : Int,
 ) -> Int = "ajni_webview_set_bounds"
+
+///|
+extern "C" fn native_last_error() -> Bytes = "ajni_last_error"

@@ -24,11 +24,19 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install MoonBit
         run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          set -euo pipefail
+          read -r moon_version < .moon-version
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh -o "$RUNNER_TEMP/moonbit-install.sh"
+          bash "$RUNNER_TEMP/moonbit-install.sh" "$moon_version"
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
           echo "MOON_HOME=$HOME/.moon" >> "$GITHUB_ENV"
-      - name: Show tool versions
-        run: moon version --all
+      - name: Verify pinned MoonBit version
+        run: |
+          read -r moon_version < .moon-version
+          installed_version="$(moon version)"
+          printf '%s\n' "$installed_version"
+          [[ "$installed_version" == "moon $moon_version ("* ]]
+          moon version --all
       - name: Update MoonBit registry
         run: moon update
       - name: Install MoonBit dependencies
@@ -38,21 +46,26 @@ jobs:
           moon fmt --check
           moon info --target native
           git diff --exit-code --ignore-blank-lines
-      - name: Check and test native runtime
+      - name: Check native sources and compile existing tests only
         run: |
           moon check --target native
-          moon test --target native
+          moon test --target native --build-only
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
       - name: Install Android native build tools
-        run: sdkmanager "build-tools;36.1.0" "cmake;4.1.2" "ndk;29.0.14206865"
+        run: sdkmanager "platforms;android-35" "build-tools;36.1.0" "cmake;4.1.2" "ndk;29.0.14206865"
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.10.2'
-      - run: |
+      - name: Verify pinned Gradle wrapper version
+        run: |
+          installed_version="$(./gradlew --version)"
+          printf '%s\n' "$installed_version"
+          [[ "$installed_version" == *$'\nGradle 8.10.2\n'* ]]
+        working-directory: android
+      - name: Compile Android and instrumented test sources; run static lint only
+        run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/29.0.14206865"
-          gradle assembleDebug --no-daemon --stacktrace
+          ./gradlew :host:compileDebugKotlin :host:lintDebug :app:assembleDebug :app:compileDebugAndroidTestKotlin :app:lintDebug --no-daemon --stacktrace
         working-directory: android

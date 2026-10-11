@@ -1,0 +1,15 @@
+# Match repository build-output exclusions; publishing uses this instead of .gitignore.
+ref/
+_build/
+.moon/
+android/.gradle/
+android/.kotlin/
+android/local.properties
+android/**/build/
+android/**/.cxx/
+android/.idea/
+.idea/
+*.iml
+
+# Published Android build scripts read this pin too.
+!/.moon-version

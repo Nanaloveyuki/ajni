@@ -18,6 +18,9 @@ extern "C" fn native_post_ui_callback() -> Int = "ajni_post_ui_callback"
 extern "C" fn native_start_worker() -> Int = "ajni_start_worker"
 
 ///|
+extern "C" fn native_last_error() -> Bytes = "ajni_last_error"
+
+///|
 extern "C" fn native_emit_for_test(
   kind : Int,
   first : Int,

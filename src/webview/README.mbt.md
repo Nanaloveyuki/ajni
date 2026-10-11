@@ -23,3 +23,22 @@ failures as `EventKind::OperationFailed(operation_id, message)`.
 `EventKind::ScriptResult(operation_id, result)`. Page messages include their
 origin and main-frame flag. Asset-loader requests emit `AssetRequest` and must
 be completed with `respond_asset` before the configured host timeout.
+
+Native command rejection raises the existing `JniError`; asynchronous host
+execution failures remain `OperationFailed` events. Outside Android, commands
+raise `NativeFailure` rather than reporting a simulated success.
+
+Queued commands and callbacks retain runtime, container, and view identities.
+Replacing a container or destroying a view invalidates its old work, including
+late script results. Newly created views inherit the host's paused state.
+Shutdown invalidates work and completes outstanding assets; the caller still
+owns explicit container detachment and view cleanup.
+
+Asset responses accept only HTTP status `100..299` or `400..599`, matching
+`WebResourceResponse`. Malformed responses terminate their own pending request;
+a wrong handle does not consume another view's request. Only an actual timeout
+returns 504; invalid responses, interruption, and internal failures are distinct.
+Renderer exit cleans up the failed view and pending assets without retrying.
+
+The trusted origin restricts the message channel and explicit asset navigation.
+It is not a general network sandbox for page subresources, links, or redirects.

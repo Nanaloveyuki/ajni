@@ -15,6 +15,7 @@ fn generated_class_name(raw : Array[Int]) -> String {
     'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F',
     'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
     'W', 'X', 'Y', 'Z', '_', '$', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    'é', '中', '😀', '\u{7F}', '\u{80}', '\u{7FF}', '\u{800}',
   ]
   let output : Array[Char] = ['p']
   for value in raw {
@@ -33,6 +34,7 @@ fn generated_native_name(raw : Array[Int]) -> String {
     'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F',
     'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
     'W', 'X', 'Y', 'Z', '_', '$', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    'é', '中', '😀', '\u{7F}', '\u{80}', '\u{7FF}', '\u{800}',
   ]
   let output : Array[Char] = ['n']
   for value in raw {
@@ -318,5 +320,51 @@ test "quickcheck: arbitrary byte input is normalized to stable UTF-8" {
     max_size=256,
     max_shrinks=100,
     seed=2026082507,
+  )
+}
+
+///|
+test "quickcheck: aggregate descriptor limits use weighted MUTF-8 bytes" {
+  @quickcheck.check(
+    (raw : (Int, Int, Int)) => {
+      // The oracle uses fixed per-scalar weights, independently of the
+      // implementation's UTF-16 code-unit scan and cached type lengths.
+      let weighted_character : (Char, Int) = match positive_mod(raw.0, 4) {
+        0 => ('a', 1)
+        1 => ('é', 2)
+        2 => ('中', 3)
+        _ => ('😀', 6)
+      }
+      let (character, width) = weighted_character
+      let parameter_count = 2 + positive_mod(raw.1, 3)
+      let count = (65535 - 3 - parameter_count * 2) / (parameter_count * width) +
+        positive_mod(raw.2, 5) -
+        2
+      let name = String::make(count, character)
+      let parameter = @ajni.JniType::object(try! @ajni.JniClass::parse(name))
+      let parameters : Array[@ajni.JniType] = []
+      let expected = StringBuilder()
+      expected.write_char('(')
+      for _ in 0..<parameter_count {
+        parameters.push(parameter)
+        expected.write_char('L')
+        expected.write_string(name)
+        expected.write_char(';')
+      }
+      expected.write_string(")V")
+      let encoded_bytes = 3 + parameter_count * (2 + count * width)
+      try @ajni.JniMethod::new(parameters[:]) catch {
+        DescriptorTooLong => encoded_bytes > 65535
+        _ => false
+      } noraise {
+        signature =>
+          encoded_bytes <= 65535 &&
+          signature.descriptor() == expected.to_string()
+      }
+    },
+    count=60,
+    max_size=64,
+    max_shrinks=30,
+    seed=2026101101,
   )
 }

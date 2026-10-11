@@ -13,6 +13,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -28,6 +29,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
@@ -66,9 +68,12 @@ object AjniWebViewHost {
   private val mainHandler = Handler(Looper.getMainLooper())
   private val attached = AtomicBoolean(false)
   private val webViews = ConcurrentHashMap<Long, ViewState>()
+  private val pendingCreations = ConcurrentHashMap<Long, Any>()
   private val pendingAssets = ConcurrentHashMap<String, PendingAsset>()
   private val nextAssetId = AtomicLong(1)
-  private var container: FrameLayout? = null
+  @Volatile private var container: FrameLayout? = null
+  @Volatile private var hostGeneration = 0L
+  private var hostPaused = false
   @Volatile private var eventObserverForTesting: ((Int, Long, String, String) -> Unit)? = null
 
   private data class ResourceLimits(
@@ -91,13 +96,16 @@ object AjniWebViewHost {
     val handle: Long,
     val view: WebView,
     val origin: Uri?,
-    val assetLoader: WebViewAssetLoader?,
+    var assetLoader: WebViewAssetLoader?,
     val limits: ResourceLimits,
+    val creationIdentity: Any?,
+    val runtimeGeneration: Long = NativeBridge.currentRuntimeGeneration(),
+    val hostGeneration: Long = AjniWebViewHost.hostGeneration,
   ) {
     val scripts = mutableListOf<ScriptHandler>()
     var currentNavigationOperation = ""
     var paused = false
-    var destroyed = false
+    @Volatile var destroyed = false
   }
 
   private data class AssetResponse(
@@ -108,29 +116,46 @@ object AjniWebViewHost {
     val body: ByteArray,
   )
 
-  private data class PendingAsset(val handle: Long, val future: CompletableFuture<AssetResponse>)
+  private data class PendingAsset(val state: ViewState, val future: CompletableFuture<AssetResponse>)
 
   fun attach(host: FrameLayout) {
     requireMainThread("attach")
+    attached.set(false)
+    val generation = invalidateHost()
     destroyAll()
+    if (hostGeneration != generation) return
     container = host
     attached.set(true)
   }
 
   fun detach(host: FrameLayout) {
+    val generation = hostGeneration
     if (Looper.myLooper() != Looper.getMainLooper()) {
-      mainHandler.post { detach(host) }
+      mainHandler.post { if (hostGeneration == generation) detach(host) }
       return
     }
     if (container !== host) return
     attached.set(false)
-    destroyAll()
-    completePendingAssets(null, unavailableAssetResponse(503, "WebView host detached"))
+    invalidateHost()
     container = null
+    destroyAll()
+  }
+
+  internal fun runtimeShutdown() {
+    requireMainThread("runtimeShutdown")
+    invalidateHost()
+    hostPaused = false
+    completePendingAssets(null, unavailableAssetResponse(503, "Native runtime unavailable"))
+  }
+
+  private fun invalidateHost(): Long = synchronized(pendingCreations) {
+    pendingCreations.clear()
+    synchronized(pendingAssets) { ++hostGeneration }
   }
 
   fun pause() {
     requireMainThread("pause")
+    hostPaused = true
     webViews.values.forEach { state ->
       if (isLive(state) && !state.paused) {
         state.view.onPause()
@@ -141,6 +166,7 @@ object AjniWebViewHost {
 
   fun resume() {
     requireMainThread("resume")
+    hostPaused = false
     webViews.values.forEach { state ->
       if (isLive(state) && state.paused) {
         state.view.onResume()
@@ -149,52 +175,85 @@ object AjniWebViewHost {
     }
   }
 
-  fun command(command: Int, handle: Long, payload: String, requestId: String): Boolean {
-    if (!attached.get()) return false
-    return runOnMain {
-      if (!attached.get() || container == null) {
-        operationFailed(handle, requestId, "WebView host is detached")
-        return@runOnMain
-      }
-      try {
-        when (command) {
-          CREATE -> createLegacy(handle, payload, requestId)
-          CREATE_WITH_OPTIONS -> createWithOptions(handle, parseFields(payload), requestId)
-          NAVIGATE -> navigate(handle, payload, requestId)
-          LOAD_HTML -> loadHtml(handle, payload, null, requestId)
-          LOAD_HTML_WITH_BASE_URL -> {
-            val fields = parseFields(payload)
-            loadHtml(handle, fields.required("html"), fields.required("base_url"), requestId)
+  fun command(command: Int, handle: Long, payload: String, requestId: String): Boolean =
+    commandForRuntime(command, handle, payload, requestId, NativeBridge.currentRuntimeGeneration())
+
+  internal fun commandForRuntime(command: Int, handle: Long, payload: String, requestId: String, runtime: Long): Boolean = synchronized(pendingCreations) {
+    val generation = hostGeneration
+    if (!isCurrentHost(generation, runtime)) return false
+    val expected = webViews[handle]
+    val creates = command == CREATE || command == CREATE_WITH_OPTIONS
+    val creation = if (creates && expected == null) pendingCreations.getOrPut(handle) { Any() } else pendingCreations[handle]
+    val accepted = runOnMain {
+      synchronized(pendingCreations) {
+        try {
+          if (!isCurrentHost(generation, runtime) || !matchesQueuedView(handle, expected, creation, creates)) return@runOnMain
+          try {
+            when (command) {
+              CREATE -> createLegacy(handle, payload, requestId, creation)
+              CREATE_WITH_OPTIONS -> createWithOptions(handle, parseFields(payload), requestId, creation)
+              NAVIGATE -> navigate(handle, payload, requestId)
+              LOAD_HTML -> loadHtml(handle, payload, null, requestId)
+              LOAD_HTML_WITH_BASE_URL -> {
+                val fields = parseFields(payload)
+                loadHtml(handle, fields.required("html"), fields.required("base_url"), requestId)
+              }
+              EVAL -> {
+                val state = requireView(handle)
+                state.view.evaluateJavascript(payload) {
+                  if (isLive(state)) emitForState(state, SCRIPT_RESULT, it ?: "null", requestId)
+                }
+              }
+              POST_MESSAGE -> postMessage(handle, parseFields(payload).required("body"))
+              RESPOND_ASSET -> respondAsset(handle, parseFields(payload), requestId)
+              ADD_DOCUMENT_START_SCRIPT -> addDocumentStartScript(handle, parseFields(payload).required("script"))
+              DESTROY -> destroy(handle, requestId)
+              else -> operationFailed(handle, requestId, "Unsupported WebView command: $command")
+            }
+          } catch (error: Exception) {
+            Log.e(TAG, "WebView command $command failed for handle $handle", error)
+            if (isCurrentHost(generation, runtime)) {
+              operationFailed(handle, requestId, error.message ?: error.javaClass.simpleName)
+            }
           }
-          EVAL -> requireView(handle).view.evaluateJavascript(payload) {
-            emit(SCRIPT_RESULT, handle, it ?: "null", requestId)
-          }
-          POST_MESSAGE -> postMessage(handle, parseFields(payload).required("body"))
-          RESPOND_ASSET -> respondAsset(handle, parseFields(payload), requestId)
-          ADD_DOCUMENT_START_SCRIPT -> addDocumentStartScript(handle, parseFields(payload).required("script"))
-          DESTROY -> destroy(handle, requestId)
-          else -> operationFailed(handle, requestId, "Unsupported WebView command: $command")
+        } finally {
+          if (creates && creation != null) pendingCreations.remove(handle, creation)
         }
-      } catch (error: Exception) {
-        Log.e(TAG, "WebView command $command failed for handle $handle", error)
-        operationFailed(handle, requestId, error.message ?: error.javaClass.simpleName)
+      }
+    }
+    if (!accepted && creates && creation != null) pendingCreations.remove(handle, creation)
+    accepted
+  }
+
+  fun setBounds(handle: Long, x: Int, y: Int, width: Int, height: Int): Boolean =
+    setBoundsForRuntime(handle, x, y, width, height, NativeBridge.currentRuntimeGeneration())
+
+  internal fun setBoundsForRuntime(handle: Long, x: Int, y: Int, width: Int, height: Int, runtime: Long): Boolean = synchronized(pendingCreations) {
+    val generation = hostGeneration
+    val expected = webViews[handle]
+    val creation = pendingCreations[handle]
+    if (!isCurrentHost(generation, runtime) || width < 1 || height < 1) return false
+    runOnMain {
+      synchronized(pendingCreations) {
+        if (!isCurrentHost(generation, runtime) || !matchesQueuedView(handle, expected, creation)) return@runOnMain
+        try {
+          requireView(handle).view.layoutParams = FrameLayout.LayoutParams(width, height).apply {
+            leftMargin = x
+            topMargin = y
+          }
+        } catch (error: Exception) {
+          Log.e(TAG, "WebView bounds update failed for handle $handle", error)
+          if (isCurrentHost(generation, runtime)) emit(FAILED, handle, error.message ?: error.javaClass.simpleName)
+        }
       }
     }
   }
 
-  fun setBounds(handle: Long, x: Int, y: Int, width: Int, height: Int): Boolean {
-    if (!attached.get() || width < 1 || height < 1) return false
-    return runOnMain {
-      try {
-        requireView(handle).view.layoutParams = FrameLayout.LayoutParams(width, height).apply {
-          leftMargin = x
-          topMargin = y
-        }
-      } catch (error: Exception) {
-        Log.e(TAG, "WebView bounds update failed for handle $handle", error)
-        emit(FAILED, handle, error.message ?: error.javaClass.simpleName)
-      }
-    }
+  private fun matchesQueuedView(handle: Long, expected: ViewState?, creation: Any?, creates: Boolean = false): Boolean {
+    val current = webViews[handle]
+    return if (expected != null) current === expected
+    else if (current != null) creation != null && current.creationIdentity === creation
+    else creation == null || (creates && pendingCreations[handle] === creation)
   }
 
   @VisibleForTesting
@@ -205,54 +264,81 @@ object AjniWebViewHost {
   @VisibleForTesting
   fun isWebViewPausedForTesting(handle: Long): Boolean = webViews[handle]?.paused ?: false
 
-  private fun createLegacy(handle: Long, initialUrl: String, operationId: String) {
-    if (webViews.containsKey(handle)) {
-      operationFailed(handle, operationId, "WebView handle already exists")
-      return
+  private fun createLegacy(handle: Long, initialUrl: String, operationId: String, creation: Any?) {
+    check(!webViews.containsKey(handle)) { "WebView handle already exists" }
+    val host = requireNotNull(container)
+    val state = allocateState(host, handle, null, defaultLimits(), creation)
+    val view = state.view
+    try {
+      configureWebView(view)
+      configureClients(state)
+      webViews[handle] = state
+      host.addView(view, fullSize())
+      inheritPause(state)
+      if (initialUrl.isNotEmpty()) navigate(handle, initialUrl, operationId)
+      check(isLive(state)) { "WebView creation was invalidated" }
+    } catch (error: Throwable) {
+      cleanupState(state)?.let(error::addSuppressed)
+      throw error
     }
-    val view = newWebView(requireNotNull(container))
-    val state = ViewState(handle, view, null, null, defaultLimits())
-    configureClients(state)
-    webViews[handle] = state
-    requireNotNull(container).addView(view, fullSize())
-    emit(CREATED, handle, initialUrl, operationId)
-    if (initialUrl.isNotEmpty()) navigate(handle, initialUrl, operationId)
+    emitForState(state, CREATED, initialUrl, operationId)
   }
 
-  private fun createWithOptions(handle: Long, fields: Map<String, String>, operationId: String) {
-    if (webViews.containsKey(handle)) {
-      operationFailed(handle, operationId, "WebView handle already exists")
-      return
-    }
+  private fun createWithOptions(handle: Long, fields: Map<String, String>, operationId: String, creation: Any?) {
+    check(!webViews.containsKey(handle)) { "WebView handle already exists" }
     val options = parseCreateOptions(fields)
     requireWebKitFeatures()
-    val view = newWebView(requireNotNull(container))
-    val assetLoader = WebViewAssetLoader.Builder()
-      .setDomain(requireNotNull(options.origin.host))
-      .addPathHandler(ASSET_PREFIX, DynamicAssetPathHandler(handle))
-      .build()
-    val state = ViewState(handle, view, options.origin, assetLoader, options.limits)
-    configureSecureChannel(state)
-    configureClients(state)
+    val host = requireNotNull(container)
+    val state = allocateState(host, handle, options.origin, options.limits, creation)
+    val view = state.view
     try {
+      configureWebView(view)
+      state.assetLoader = WebViewAssetLoader.Builder()
+        .setDomain(requireNotNull(options.origin.host))
+        .addPathHandler(ASSET_PREFIX, DynamicAssetPathHandler(state))
+        .build()
+      configureSecureChannel(state)
+      configureClients(state)
       options.scripts.forEach { addScript(state, it) }
       webViews[handle] = state
-      requireNotNull(container).addView(view, fullSize())
-      emit(CREATED, handle, options.initial, operationId)
+      host.addView(view, fullSize())
+      inheritPause(state)
       when (options.initialKind) {
         "empty" -> Unit
         "url" -> navigate(handle, options.initial, operationId)
         "html" -> loadHtml(handle, options.initial, options.baseUrl, operationId)
       }
-    } catch (error: Exception) {
-      state.scripts.forEach(ScriptHandler::remove)
-      view.destroy()
+      check(isLive(state)) { "WebView creation was invalidated" }
+    } catch (error: Throwable) {
+      cleanupState(state)?.let(error::addSuppressed)
+      throw error
+    }
+    emitForState(state, CREATED, options.initial, operationId)
+  }
+
+  private fun allocateState(host: FrameLayout, handle: Long, origin: Uri?, limits: ResourceLimits, creation: Any?): ViewState {
+    val view = WebView(host.context)
+    try {
+      return ViewState(handle, view, origin, null, limits, creation)
+    } catch (error: Throwable) {
+      try {
+        view.destroy()
+      } catch (cleanupError: Throwable) {
+        if (cleanupError !== error) error.addSuppressed(cleanupError)
+      }
       throw error
     }
   }
 
+  private fun inheritPause(state: ViewState) {
+    if (hostPaused) {
+      state.view.onPause()
+      state.paused = true
+    }
+  }
+
   @SuppressLint("SetJavaScriptEnabled")
-  private fun newWebView(host: FrameLayout): WebView = WebView(host.context).apply {
+  private fun configureWebView(view: WebView) = with(view) {
     setBackgroundColor(Color.WHITE)
     settings.javaScriptEnabled = true
     settings.domStorageEnabled = true
@@ -274,7 +360,7 @@ object AjniWebViewHost {
         operationFailed(state.handle, "", "Page message exceeds configured size limit")
         return@addWebMessageListener
       }
-      emit(PAGE_MESSAGE, state.handle, encodeFields(mapOf(
+      emitForState(state, PAGE_MESSAGE, encodeFields(mapOf(
         "body" to body,
         "origin" to sourceOrigin.toString(),
         "main_frame" to if (isMainFrame) "1" else "0",
@@ -285,49 +371,56 @@ object AjniWebViewHost {
   private fun configureClients(state: ViewState) {
     state.view.webViewClient = object : WebViewClient() {
       override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
-        if (isLive(state)) emit(NAVIGATION_STARTED, state.handle, url.orEmpty(), state.currentNavigationOperation)
+        if (isLive(state)) emitForState(state, NAVIGATION_STARTED, url.orEmpty(), state.currentNavigationOperation)
       }
 
       override fun onPageFinished(view: WebView, url: String?) {
-        if (isLive(state)) emit(NAVIGATION_FINISHED, state.handle, url.orEmpty(), state.currentNavigationOperation)
+        if (isLive(state)) emitForState(state, NAVIGATION_FINISHED, url.orEmpty(), state.currentNavigationOperation)
       }
 
       override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
         if (isLive(state) && request.isForMainFrame) {
-          operationFailed(state.handle, state.currentNavigationOperation, error.description?.toString().orEmpty())
+          emitForState(state, OPERATION_FAILED, error.description?.toString().orEmpty(), state.currentNavigationOperation)
         }
       }
 
       override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
-        state.assetLoader?.shouldInterceptRequest(request.url)
+        if (isLive(state)) state.assetLoader?.shouldInterceptRequest(request.url)
+        else unavailableAssetResponse(503, "WebView destroyed").toWebResponse()
+
+      @android.annotation.TargetApi(Build.VERSION_CODES.O)
+      override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+        if (view !== state.view) return false
+        if (state.destroyed) return true
+        val generation = hostGeneration
+        val wasLive = isLive(state)
+        val message = if (detail.didCrash()) "WebView renderer crashed" else "WebView renderer terminated"
+        cleanupState(state)?.let { Log.e(TAG, "Renderer cleanup failed for handle ${state.handle}", it) }
+        if (wasLive) {
+          emitTerminatedState(state, FAILED, message, generation = generation)
+          emitTerminatedState(state, DESTROYED, "", generation = generation)
+        }
+        return true
+      }
     }
     state.view.webChromeClient = object : WebChromeClient() {
       override fun onReceivedTitle(view: WebView, title: String?) {
-        if (isLive(state)) emit(TITLE_CHANGED, state.handle, title.orEmpty())
+        if (isLive(state)) emitForState(state, TITLE_CHANGED, title.orEmpty())
       }
     }
   }
 
   private fun navigate(handle: Long, url: String, operationId: String) {
     val state = requireView(handle)
-    state.origin?.let { origin ->
-      val destination = Uri.parse(url)
-      require(
-        destination.scheme == "https" &&
-          destination.host == origin.host &&
-          destination.port == -1 &&
-          destination.userInfo == null &&
-          destination.path?.startsWith(ASSET_PREFIX) == true,
-      ) { "Navigation must remain within the configured asset origin" }
-    }
+    state.origin?.let { validateAssetUrl(it, url, "Navigation must remain within the configured asset origin") }
     state.currentNavigationOperation = operationId
     state.view.loadUrl(url)
   }
 
   private fun loadHtml(handle: Long, html: String, baseUrl: String?, operationId: String) {
     val state = requireView(handle)
-    if (baseUrl != null && state.origin != null && !baseUrl.startsWith("${state.origin}/assets/")) {
-      throw IllegalArgumentException("HTML base URL must use the configured asset origin")
+    if (baseUrl != null && state.origin != null) {
+      validateAssetUrl(state.origin, baseUrl, "HTML base URL must use the configured asset origin")
     }
     state.currentNavigationOperation = operationId
     state.view.loadDataWithBaseURL(baseUrl, html, "text/html", "utf-8", null)
@@ -354,81 +447,143 @@ object AjniWebViewHost {
 
   private fun respondAsset(handle: Long, fields: Map<String, String>, operationId: String) {
     val requestId = fields.required("request_id")
-    val pending = pendingAssets.remove(requestId)
-    if (pending == null || pending.handle != handle) {
+    val pending = pendingAssets[requestId]
+    if (pending == null || pending.state.handle != handle || webViews[handle] !== pending.state) {
       operationFailed(handle, operationId, "Unknown asset request")
       return
     }
-    val state = webViews[handle]
-    if (state == null || state.destroyed) {
-      pending.future.complete(unavailableAssetResponse(503, "WebView destroyed"))
+    val state = pending.state
+    if (!isLive(state)) {
+      finishPendingAsset(requestId, pending, unavailableAssetResponse(503, "WebView destroyed"))
       return
     }
-    val body = decodeBase64Bytes(fields.required("body"))
-    if (state.limits.maxAssetResponseBytes > 0 && body.size.toLong() > state.limits.maxAssetResponseBytes) {
-      pending.future.complete(unavailableAssetResponse(413, "Asset response exceeds configured size limit"))
-      return
+    val response = try {
+      val status = fields.required("status").toIntOrNull()?.takeIf { it in 100..299 || it in 400..599 }
+        ?: throw IllegalArgumentException("Asset response status must be 100..299 or 400..599")
+      val mime = fields.required("mime")
+      require(!mime.any { it < ' ' || it == '\u007f' }) { "Invalid asset response MIME type" }
+      val encoding = fields["encoding"]?.takeIf(String::isNotEmpty)
+      require(encoding == null || !encoding.any { it < ' ' || it == '\u007f' }) { "Invalid asset response encoding" }
+      val headers = parseHeaders(fields["headers"].orEmpty())
+      val body = decodeBase64Bytes(fields.required("body"))
+      if (state.limits.maxAssetResponseBytes > 0 && body.size.toLong() > state.limits.maxAssetResponseBytes) {
+        finishPendingAsset(requestId, pending, unavailableAssetResponse(413, "Asset response exceeds configured size limit"))
+        operationFailed(handle, operationId, "Asset response exceeds configured size limit")
+        return
+      }
+      AssetResponse(status, mime, encoding, headers, body)
+    } catch (error: Exception) {
+      finishPendingAsset(requestId, pending, unavailableAssetResponse(400, "Invalid asset response"))
+      throw error
     }
-    val status = fields.required("status").toIntOrNull()?.takeIf { it in 100..599 }
-      ?: throw IllegalArgumentException("Asset response status must be 100..599")
-    pending.future.complete(AssetResponse(
-      status,
-      fields.required("mime"),
-      fields["encoding"]?.takeIf(String::isNotEmpty),
-      parseHeaders(fields["headers"].orEmpty()),
-      body,
-    ))
+    if (!finishPendingAsset(requestId, pending, response)) {
+      operationFailed(handle, operationId, "Unknown asset request")
+    }
   }
 
   private fun destroy(handle: Long, operationId: String = "") {
-    val state = webViews.remove(handle)
+    val generation = hostGeneration
+    val state = webViews[handle]
     if (state == null) {
       emit(DESTROYED, handle, "", operationId)
       return
     }
-    state.destroyed = true
-    completePendingAssets(handle, unavailableAssetResponse(503, "WebView destroyed"))
-    if (state.origin != null && WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
-      WebViewCompat.removeWebMessageListener(state.view, MESSAGE_LISTENER_NAME)
-    }
-    state.scripts.forEach(ScriptHandler::remove)
-    (state.view.parent as? ViewGroup)?.removeView(state.view)
-    state.view.destroy()
-    emit(DESTROYED, handle, "", operationId)
+    val failure = cleanupState(state)
+    if (failure != null) emitTerminatedState(state, OPERATION_FAILED, failure.message ?: failure.javaClass.simpleName, operationId, generation)
+    emitTerminatedState(state, DESTROYED, "", operationId, generation)
   }
 
-  private fun destroyAll() = webViews.keys.toList().forEach { destroy(it) }
+  private fun cleanupState(state: ViewState): Throwable? {
+    synchronized(pendingAssets) {
+      if (state.destroyed) return null
+      state.destroyed = true
+      webViews.remove(state.handle, state)
+    }
+    completePendingAssets(state, unavailableAssetResponse(503, "WebView destroyed"))
+    var failure: Throwable? = null
+    fun cleanup(action: () -> Unit) {
+      try {
+        action()
+      } catch (error: Throwable) {
+        val previous = failure
+        if (previous == null) failure = error else if (previous !== error) previous.addSuppressed(error)
+      }
+    }
+    if (state.origin != null) cleanup {
+      if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+        WebViewCompat.removeWebMessageListener(state.view, MESSAGE_LISTENER_NAME)
+      }
+    }
+    state.scripts.forEach { script -> cleanup { script.remove() } }
+    state.scripts.clear()
+    cleanup { (state.view.parent as? ViewGroup)?.removeView(state.view) }
+    cleanup { state.view.destroy() }
+    return failure
+  }
 
-  private class DynamicAssetPathHandler(private val handle: Long) : WebViewAssetLoader.PathHandler {
+  private fun destroyAll() {
+    val generation = hostGeneration
+    val states = webViews.values.toList()
+    val failures = states.map { cleanupState(it) }
+    states.forEachIndexed { index, state ->
+      failures[index]?.let {
+        Log.e(TAG, "WebView cleanup failed for handle ${state.handle}", it)
+        emitTerminatedState(state, OPERATION_FAILED, it.message ?: it.javaClass.simpleName, generation = generation)
+      }
+      emitTerminatedState(state, DESTROYED, "", generation = generation)
+    }
+  }
+
+  private class DynamicAssetPathHandler(private val state: ViewState) : WebViewAssetLoader.PathHandler {
     override fun handle(path: String): WebResourceResponse {
-      val state = webViews[handle] ?: return unavailableAssetResponse(503, "WebView destroyed").toWebResponse()
+      if (!isLive(state)) return unavailableAssetResponse(503, "WebView destroyed").toWebResponse()
       val normalized = normalizeAssetPath(path) ?: return unavailableAssetResponse(400, "Invalid asset path").toWebResponse()
-      val id = "${handle}:${nextAssetId.getAndIncrement()}"
-      if (state.limits.maxPendingAssetRequests > 0 && pendingAssets.values.count { it.handle == handle } >= state.limits.maxPendingAssetRequests) {
-        return unavailableAssetResponse(429, "Too many pending asset requests").toWebResponse()
-      }
+      val id = "${state.handle}:${nextAssetId.getAndIncrement()}"
       val future = CompletableFuture<AssetResponse>()
-      val pending = PendingAsset(handle, future)
+      val pending = PendingAsset(state, future)
       if (!admitPendingAsset(id, pending, state.limits.maxPendingAssetRequests)) {
-        return unavailableAssetResponse(429, "Too many pending asset requests").toWebResponse()
+        val status = if (isLive(state)) 429 else 503
+        val response = unavailableAssetResponse(status, if (status == 429) "Too many pending asset requests" else "WebView destroyed")
+        future.complete(response)
+        return response.toWebResponse()
       }
-      if (!mainHandler.post {
-          if (isLive(state) && pendingAssets.containsKey(id)) {
-            emit(ASSET_REQUEST, handle, encodeFields(mapOf("request_id" to id, "path" to normalized)))
-          } else if (pendingAssets.remove(id, pending)) {
-            pending.future.complete(unavailableAssetResponse(503, "WebView destroyed"))
-          }
-        }) {
-        pendingAssets.remove(id, pending)
-        return unavailableAssetResponse(503, "Native runtime unavailable").toWebResponse()
-      }
-      return try {
+      try {
+        if (!mainHandler.post {
+            try {
+              if (isLive(state) && pendingAssets[id] === pending) {
+                emitForState(state, ASSET_REQUEST, encodeFields(mapOf("request_id" to id, "path" to normalized)))
+              } else {
+                finishPendingAsset(id, pending, unavailableAssetResponse(503, "WebView destroyed"))
+              }
+            } catch (error: Throwable) {
+              finishPendingAsset(id, pending, unavailableAssetResponse(500, "Asset request dispatch failed"))
+              if (error !is Exception) throw error
+              Log.e(TAG, "Asset request dispatch failed for handle ${state.handle}", error)
+            }
+          }) {
+          val response = unavailableAssetResponse(503, "Native runtime unavailable")
+          finishPendingAsset(id, pending, response)
+          return response.toWebResponse()
+        }
         val response = if (state.limits.assetResponseTimeoutMillis == 0L) future.get()
         else future.get(state.limits.assetResponseTimeoutMillis, TimeUnit.MILLISECONDS)
-        response.toWebResponse()
-      } catch (_: Exception) {
-        pendingAssets.remove(id, pending)
-        unavailableAssetResponse(504, "Asset response timed out").toWebResponse()
+        return response.toWebResponse()
+      } catch (_: TimeoutException) {
+        val response = unavailableAssetResponse(504, "Asset response timed out")
+        finishPendingAsset(id, pending, response)
+        return response.toWebResponse()
+      } catch (_: InterruptedException) {
+        val response = unavailableAssetResponse(503, "Asset response interrupted")
+        finishPendingAsset(id, pending, response)
+        Thread.currentThread().interrupt()
+        return response.toWebResponse()
+      } catch (error: Exception) {
+        val response = unavailableAssetResponse(500, "Asset response failed")
+        finishPendingAsset(id, pending, response)
+        Log.e(TAG, "Asset response failed for handle ${state.handle}", error)
+        return response.toWebResponse()
+      } finally {
+        finishPendingAsset(id, pending, unavailableAssetResponse(500, "Asset request terminated"))
       }
     }
   }
@@ -441,16 +596,22 @@ object AjniWebViewHost {
     status, "text/plain", "utf-8", mapOf("Cache-Control" to "no-store"), message.toByteArray(StandardCharsets.UTF_8),
   )
 
-  private fun completePendingAssets(handle: Long?, response: AssetResponse) {
+  private fun completePendingAssets(state: ViewState?, response: AssetResponse) {
     pendingAssets.entries.toList().forEach { (id, pending) ->
-      if (handle == null || pending.handle == handle) {
-        if (pendingAssets.remove(id, pending)) pending.future.complete(response)
-      }
+      if (state == null || pending.state === state) finishPendingAsset(id, pending, response)
     }
   }
 
+  private fun finishPendingAsset(id: String, pending: PendingAsset, response: AssetResponse): Boolean = synchronized(pendingAssets) {
+    val owned = pendingAssets[id] === pending
+    // Completion precedes removal, so absent entries never hide a non-terminal future.
+    pending.future.complete(response)
+    if (owned) pendingAssets.remove(id, pending)
+    owned
+  }
+
   private fun admitPendingAsset(id: String, pending: PendingAsset, limit: Int): Boolean = synchronized(pendingAssets) {
-    if (limit > 0 && pendingAssets.values.count { it.handle == pending.handle } >= limit) false
+    if (!isLive(pending.state) || (limit > 0 && pendingAssets.values.count { it.state === pending.state } >= limit)) false
     else {
       pendingAssets[id] = pending
       true
@@ -467,6 +628,10 @@ object AjniWebViewHost {
       "Initial content must be exclusive and match initial_kind"
     }
     require(initialKind != "html" || baseUrl.isNotEmpty()) { "HTML initial content requires base_url" }
+    when (initialKind) {
+      "url" -> validateAssetUrl(origin, initial, "Navigation must remain within the configured asset origin")
+      "html" -> validateAssetUrl(origin, baseUrl, "HTML base URL must use the configured asset origin")
+    }
     val scripts = fields["scripts"].orEmpty().split(',').filter(String::isNotEmpty).map(::decodeBase64)
     return CreateOptions(origin, initialKind, initial, baseUrl, scripts, ResourceLimits(
       limit(fields, "max_page_message_bytes", DEFAULT_PAGE_MESSAGE_BYTES, Long.MAX_VALUE),
@@ -485,6 +650,12 @@ object AjniWebViewHost {
       "trusted origin must be an HTTPS origin without a path"
     }
     return Uri.Builder().scheme("https").authority(parsed.host).build()
+  }
+
+  private fun validateAssetUrl(origin: Uri, value: String, message: String) {
+    val destination = Uri.parse(value)
+    require(destination.scheme == "https" && destination.host == origin.host && destination.port == -1 &&
+      destination.userInfo == null && destination.path?.startsWith(ASSET_PREFIX) == true) { message }
   }
 
   private fun requireWebKitFeatures() {
@@ -525,8 +696,12 @@ object AjniWebViewHost {
     if (value.isEmpty()) emptyMap() else value.split(',').associate { record ->
       val fields = parseFields(decodeBase64(record))
       val name = fields.required("name")
-      require(!name.any { it <= ' ' || it == ':' }) { "Invalid asset response header" }
-      name to fields.required("value")
+      require(name.isNotEmpty() && name.all { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it in "!#$%&'*+-.^_`|~" }) {
+        "Invalid asset response header"
+      }
+      val headerValue = fields.required("value")
+      require(!headerValue.any { (it < ' ' && it != '\t') || it == '\u007f' }) { "Invalid asset response header value" }
+      name to headerValue
     }
 
   private fun normalizeAssetPath(path: String): String? {
@@ -538,12 +713,20 @@ object AjniWebViewHost {
 
   private fun reasonPhrase(status: Int) = when (status) {
     400 -> "Bad Request"; 413 -> "Payload Too Large"; 429 -> "Too Many Requests"
-    503 -> "Service Unavailable"; 504 -> "Gateway Timeout"; else -> "OK"
+    500 -> "Internal Server Error"; 503 -> "Service Unavailable"; 504 -> "Gateway Timeout"; else -> "Response"
   }
 
-  private fun isLive(state: ViewState) = attached.get() && !state.destroyed && webViews[state.handle] === state
+  private fun isCurrentHost(generation: Long, runtime: Long) =
+    attached.get() && container != null && hostGeneration == generation && NativeBridge.matchesRuntimeGeneration(runtime)
 
-  private fun requireView(handle: Long): ViewState = webViews[handle] ?: error("WebView handle does not exist")
+  private fun isLive(state: ViewState) =
+    !state.destroyed && webViews[state.handle] === state && isCurrentHost(state.hostGeneration, state.runtimeGeneration)
+
+  private fun requireView(handle: Long): ViewState {
+    val state = webViews[handle] ?: error("WebView handle does not exist")
+    check(isLive(state)) { "WebView handle belongs to an inactive host" }
+    return state
+  }
 
   private fun operationFailed(handle: Long, operationId: String, message: String) = emit(OPERATION_FAILED, handle, message, operationId)
 
@@ -555,8 +738,34 @@ object AjniWebViewHost {
     check(Looper.myLooper() == Looper.getMainLooper()) { "WebView host $operation must run on the main thread" }
   }
 
+  private fun emitForState(state: ViewState, kind: Int, payload: String, detail: String = "") {
+    if (!isLive(state)) return
+    eventObserverForTesting?.invoke(kind, state.handle, payload, detail)
+    if (isLive(state)) NativeBridge.webViewEventForRuntime(kind, state.handle, payload, detail, state.runtimeGeneration)
+  }
+
+  internal fun eventIdentityCheck(handle: Long): () -> Boolean {
+    val generation = hostGeneration
+    val state = webViews[handle]
+    return { hostGeneration == generation && webViews[handle] === state && (state == null || isLive(state)) }
+  }
+
+  private fun emitTerminatedState(state: ViewState, kind: Int, payload: String, detail: String = "", generation: Long = hostGeneration) {
+    if (hostGeneration != generation || !NativeBridge.matchesRuntimeGeneration(state.runtimeGeneration) || webViews.containsKey(state.handle)) return
+    eventObserverForTesting?.invoke(kind, state.handle, payload, detail)
+    if (hostGeneration == generation && !webViews.containsKey(state.handle)) {
+      NativeBridge.webViewEventForRuntime(kind, state.handle, payload, detail, state.runtimeGeneration)
+    }
+  }
+
   private fun emit(kind: Int, handle: Long, payload: String, detail: String = "") {
+    val runtime = NativeBridge.currentRuntimeGeneration()
+    val generation = hostGeneration
+    val state = webViews[handle]
+    if (!NativeBridge.matchesRuntimeGeneration(runtime)) return
     eventObserverForTesting?.invoke(kind, handle, payload, detail)
-    NativeBridge.webViewEvent(kind, handle, payload, detail)
+    if (hostGeneration == generation && webViews[handle] === state) {
+      NativeBridge.webViewEventForRuntime(kind, handle, payload, detail, runtime)
+    }
   }
 }

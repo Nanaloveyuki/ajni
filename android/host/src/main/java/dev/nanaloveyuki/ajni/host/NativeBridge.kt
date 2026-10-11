@@ -5,7 +5,6 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Surface
 import android.widget.FrameLayout
-import java.util.concurrent.atomic.AtomicBoolean
 
 /** Stable JNI entry class for applications that link ajni's native library. */
 object NativeBridge {
@@ -16,7 +15,9 @@ object NativeBridge {
   const val LIFECYCLE_STOPPED = 5
   const val LIFECYCLE_DESTROYED = 6
   private const val UI_TASK_EVENT = 21
-  private val initialized = AtomicBoolean(false)
+  @Volatile private var runtimeGeneration = 0L
+  private var nextRuntimeGeneration = 1L
+  private var runtimeTransition = false
   private val mainHandler = Handler(Looper.getMainLooper())
 
   init {
@@ -24,26 +25,47 @@ object NativeBridge {
   }
 
   fun initialize(context: Context) {
-    if (initialized.compareAndSet(false, true)) {
-      try {
-        nativeInitialize(context.applicationContext)
-      } catch (error: Throwable) {
-        initialized.set(false)
-        throw error
-      }
+    requireMainThread("initialize")
+    if (runtimeGeneration != 0L) return
+    check(!runtimeTransition) { "NativeBridge lifecycle transition is in progress" }
+    val generation = nextRuntimeGeneration++
+    check(generation > 0L) { "NativeBridge runtime generation exhausted" }
+    runtimeTransition = true
+    try {
+      nativeInitialize(context.applicationContext, generation)
+      runtimeGeneration = generation
+    } finally {
+      runtimeTransition = false
     }
   }
 
   fun shutdown() {
-    if (initialized.compareAndSet(true, false)) {
+    requireMainThread("shutdown")
+    if (runtimeGeneration == 0L) return
+    runtimeTransition = true
+    runtimeGeneration = 0L
+    try {
       nativeShutdown()
+    } finally {
+      try {
+        AjniWebViewHost.runtimeShutdown()
+      } finally {
+        runtimeTransition = false
+      }
     }
   }
 
+  internal fun currentRuntimeGeneration(): Long = runtimeGeneration
+
+  internal fun matchesRuntimeGeneration(generation: Long): Boolean =
+    generation != 0L && runtimeGeneration == generation
+
   fun lifecycle(state: Int) {
     requireMainThread("lifecycle")
-    if (initialized.get()) {
+    val generation = currentRuntimeGeneration()
+    if (matchesRuntimeGeneration(generation)) {
       nativeLifecycle(state)
+      if (!matchesRuntimeGeneration(generation)) return
       when (state) {
         LIFECYCLE_RESUMED -> AjniWebViewHost.resume()
         LIFECYCLE_PAUSED -> AjniWebViewHost.pause()
@@ -53,21 +75,21 @@ object NativeBridge {
 
   fun surfaceCreated(surface: Surface, width: Int, height: Int) {
     requireMainThread("surfaceCreated")
-    if (initialized.get()) nativeSurfaceCreated(surface, width, height)
+    if (runtimeGeneration != 0L) nativeSurfaceCreated(surface, width, height)
   }
 
   fun surfaceChanged(width: Int, height: Int) {
     requireMainThread("surfaceChanged")
-    if (initialized.get()) nativeSurfaceChanged(width, height)
+    if (runtimeGeneration != 0L) nativeSurfaceChanged(width, height)
   }
 
   fun surfaceDestroyed() {
     requireMainThread("surfaceDestroyed")
-    if (initialized.get()) nativeSurfaceDestroyed()
+    if (runtimeGeneration != 0L) nativeSurfaceDestroyed()
   }
 
   fun startWorker() {
-    check(initialized.get()) { "NativeBridge is not initialized" }
+    check(runtimeGeneration != 0L) { "NativeBridge is not initialized" }
     nativeStartWorker()
   }
 
@@ -87,10 +109,14 @@ object NativeBridge {
   }
 
   @JvmStatic
-  fun postUiCallback(eventKind: Int): Boolean {
-    if (!initialized.get()) return false
+  fun postUiCallback(eventKind: Int): Boolean =
+    postUiCallbackForRuntime(eventKind, currentRuntimeGeneration())
+
+  @JvmStatic
+  private fun postUiCallbackForRuntime(eventKind: Int, runtimeGeneration: Long): Boolean {
+    if (!matchesRuntimeGeneration(runtimeGeneration)) return false
     return mainHandler.post {
-      if (initialized.get()) nativeOnUiTask(eventKind)
+      if (matchesRuntimeGeneration(runtimeGeneration)) nativeOnUiTask(eventKind)
     }
   }
 
@@ -99,21 +125,42 @@ object NativeBridge {
     AjniWebViewHost.command(command, handle, payload, requestId)
 
   @JvmStatic
+  private fun webViewCommandForRuntime(
+    command: Int, handle: Long, payload: String, requestId: String, runtimeGeneration: Long,
+  ): Boolean = matchesRuntimeGeneration(runtimeGeneration) &&
+    AjniWebViewHost.commandForRuntime(command, handle, payload, requestId, runtimeGeneration)
+
+  @JvmStatic
   fun webViewSetBounds(handle: Long, x: Int, y: Int, width: Int, height: Int): Boolean =
     AjniWebViewHost.setBounds(handle, x, y, width, height)
 
   @JvmStatic
+  private fun webViewSetBoundsForRuntime(
+    handle: Long, x: Int, y: Int, width: Int, height: Int, runtimeGeneration: Long,
+  ): Boolean = matchesRuntimeGeneration(runtimeGeneration) &&
+    AjniWebViewHost.setBoundsForRuntime(handle, x, y, width, height, runtimeGeneration)
+
+  @JvmStatic
   fun webViewEvent(kind: Int, handle: Long, payload: String, detail: String = "") {
     requireMainThread("webViewEvent")
-    if (initialized.get()) nativeWebViewEvent(kind, handle, payload, detail)
+    if (runtimeGeneration != 0L) nativeWebViewEvent(kind, handle, payload, detail)
+  }
+
+  internal fun webViewEventForRuntime(
+    kind: Int, handle: Long, payload: String, detail: String, generation: Long,
+  ) {
+    requireMainThread("webViewEvent")
+    if (matchesRuntimeGeneration(generation)) nativeWebViewEvent(kind, handle, payload, detail)
   }
 
   /** Posts a WebView event from a WebKit worker thread without entering JNI there. */
   @JvmStatic
   fun postWebViewEvent(kind: Int, handle: Long, payload: String, detail: String = ""): Boolean {
-    if (!initialized.get()) return false
+    val generation = currentRuntimeGeneration()
+    if (!matchesRuntimeGeneration(generation)) return false
+    val isCurrentView = AjniWebViewHost.eventIdentityCheck(handle)
     return mainHandler.post {
-      if (initialized.get()) nativeWebViewEvent(kind, handle, payload, detail)
+      if (matchesRuntimeGeneration(generation) && isCurrentView()) nativeWebViewEvent(kind, handle, payload, detail)
     }
   }
 
@@ -121,7 +168,7 @@ object NativeBridge {
     check(Looper.myLooper() == Looper.getMainLooper()) { "NativeBridge.$operation must run on the main thread" }
   }
 
-  @JvmStatic private external fun nativeInitialize(context: Context)
+  @JvmStatic private external fun nativeInitialize(context: Context, runtimeGeneration: Long)
   @JvmStatic private external fun nativeShutdown()
   @JvmStatic private external fun nativeLifecycle(state: Int)
   @JvmStatic private external fun nativeSurfaceCreated(surface: Surface, width: Int, height: Int)

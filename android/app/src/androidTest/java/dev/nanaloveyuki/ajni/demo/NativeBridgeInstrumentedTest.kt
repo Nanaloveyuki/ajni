@@ -19,7 +19,10 @@ import org.junit.runner.RunWith
 class NativeBridgeInstrumentedTest {
   @Test
   fun unicodeStringUsesUtf16SafeJniPath() {
-    NativeBridge.initialize(ApplicationProvider.getApplicationContext())
+    val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+    instrumentation.runOnMainSync {
+      NativeBridge.initialize(ApplicationProvider.getApplicationContext())
+    }
     assertEquals("JNI \u4e2d\u6587 \uD83D\uDE80", NativeBridge.echo("JNI \u4e2d\u6587 \uD83D\uDE80"))
   }
 
@@ -68,8 +71,11 @@ class NativeBridgeInstrumentedTest {
       assertEquals(1, firstHost.childCount)
       NativeBridge.lifecycle(NativeBridge.LIFECYCLE_PAUSED)
       assertTrue(AjniWebViewHost.isWebViewPausedForTesting(firstHandle))
+      assertTrue(NativeBridge.webViewCommand(AjniWebViewHost.CREATE, 83L, "", "create-paused"))
+      assertTrue(AjniWebViewHost.isWebViewPausedForTesting(83L))
       NativeBridge.lifecycle(NativeBridge.LIFECYCLE_RESUMED)
       assertFalse(AjniWebViewHost.isWebViewPausedForTesting(firstHandle))
+      assertFalse(AjniWebViewHost.isWebViewPausedForTesting(83L))
       secondHost = FrameLayout(context)
       NativeBridge.attachWebViewContainer(secondHost)
       assertEquals(0, firstHost.childCount)
@@ -85,7 +91,7 @@ class NativeBridgeInstrumentedTest {
   }
 
   @Test
-  fun secureWebViewDeliversPageMessageAndCompletesAssetRequest() {
+  fun secureWebViewHostObserverSeesPageMessageAndCompletesAssetRequest() {
     val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
     val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     val pageMessage = CountDownLatch(1)

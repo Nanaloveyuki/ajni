@@ -28,8 +28,10 @@ import {
 ## Generic JNI Declarations
 
 The root package has no Android dependency. It validates internal class names,
-prevents `void` parameters, enforces the JVM's 255 array-dimension and
-parameter-slot limits, and keeps raw JNI pointers out of MoonBit:
+prevents `void` parameters, enforces 255 array dimensions, 255 explicit parameter
+slots, and the classfile's 65,535-byte Modified UTF-8 limit, and keeps raw JNI
+pointers out of MoonBit. Instance/interface methods must additionally reserve
+one parameter slot for implicit `this`; a descriptor does not prove native ABI.
 
 ```moonbit nocheck
 let string = try! @ajni.JniClass::parse("java/lang/String")
@@ -45,6 +47,11 @@ Platform-specific code can consume these values when registering JNI methods.
 Raw `JNIEnv*`, `jobject`, global-reference deletion, and Java attachment
 remain C-owned because their lifetimes cannot be safely encoded as plain
 MoonBit values.
+
+`JniClass::parse` allows at most 65,533 MUTF-8 name bytes, reserving `L` and `;`
+so existing non-raising object/descriptor constructors remain valid. Native
+method names may use all 65,535 bytes. These are encoding-byte limits, not
+UTF-16 lengths or ordinary UTF-8 lengths.
 
 ## Android Runtime
 
@@ -71,6 +78,12 @@ let subscription = @android.install_event_handler(event => match event {
 Looper. `@android.start_worker()` demonstrates a native-owned thread attaching
 to ART, posting back to the UI thread, then detaching.
 
+Synchronous failures distinguish `NotInitialized`, `RuntimeDestroyed`,
+`JavaException`, and `NativeFailure`. Outside Android, readiness is false and
+Android/WebView operations raise `NativeFailure` instead of simulated success.
+Ordinary UTF-8 conversion replaces malformed input bytes with U+FFFD; overlong
+encodings, encoded surrogates, and out-of-range scalars are not accepted as text.
+
 ## Android Host
 
 The Android application links the generated MoonBit native artifact and uses
@@ -96,6 +109,11 @@ NativeBridge.shutdown()
 resume and pause attached WebViews. Attaching a replacement container destroys
 views in the previous container, so each Activity or host recreation starts
 from an explicit new `create` call.
+
+Initialize and shut down on the main thread. Readiness is published only after
+native initialization succeeds. Old runtime/container/view work is discarded;
+new views inherit the host's paused state. Shutdown completes pending assets
+but does not implicitly detach the caller-owned container.
 
 Use `android/app/src/main/cpp/CMakeLists.txt` as the integration template. It
 generates the MoonBit Android host, compiles the MoonBit runtime, and links
@@ -149,30 +167,53 @@ only through AndroidX WebKit's trusted-origin listener. Embedded resources use
 the same origin's `/assets/` path and emit `AssetRequest`; complete them with
 `respond_asset` before the configured timeout.
 
+Asset responses accept `100..299` or `400..599`, not redirects. Malformed
+responses complete their owned request with an error; wrong handles do not
+consume another view's request. Renderer exit destroys the affected view and
+completes its pending resources without retry. The trusted message origin is
+not a network sandbox for page subresources, redirects, or links.
+
+## Maintenance Scope
+
+Until MoonBit 1.0 is officially released, ajni focuses on fixes to existing
+behavior, build correctness, and documentation. Feature expansion is deferred.
+See [BUGFIX_PLAN.md](BUGFIX_PLAN.md) for categorized defects, implementation
+status, evidence, and remaining validation limits.
+
 ## Build And Verify
 
-Host-side checks:
+Current static checks:
 
 ```powershell
 moon fmt --check
 moon check --target native
-moon test --target native -v
+moon test --target native --build-only
+moon info --target native
 ```
 
-For an Android build, install Android SDK platform tools, NDK `29.0.14206865`,
-CMake, Java 17, Gradle, and MoonBit. The bundled demo can run its emulator
-tests with:
+Android/WebView runtime testing is currently deferred. Static checks and APK
+compilation do not prove ART, lifecycle, Surface, or WebView behavior. Android
+compilation additionally requires the SDK, NDK `29.0.14206865`, CMake, Java 17,
+and the pinned Gradle `8.10.2` wrapper under `android/`.
+
+CI installs and verifies the MoonBit version in `.moon-version`, compiles tests
+without executing them, builds both configured Android ABIs, and runs Kotlin
+compilation/static lint. The host ships precise JNI consumer keep rules;
+runtime lookup in an R8-minified consumer remains a separate verification step.
+
+The following emulator test command is retained for when runtime testing resumes;
+it is not part of the current validation requirement:
 
 ```powershell
 $env:ANDROID_SDK_ROOT = "C:\path\to\Android\Sdk"
 $env:ANDROID_NDK_HOME = "C:\path\to\android-ndk-r29"
 $env:ANDROID_SERIAL = "emulator-5554"
-gradle -p android :app:connectedDebugAndroidTest
+.\android\gradlew.bat -p android :app:connectedDebugAndroidTest
 ```
 
-The GitHub workflow builds the Android demo for both configured ABIs. Device
-and emulator validation remain appropriate for changes that alter Android UI
-or WebView behavior.
+The GitHub workflow builds the Android demo for both configured ABIs but does
+not execute instrumentation tests. Record platform runtime verification as
+deferred, not passed, while only static checks or compilation are available.
 
 ## Contributing
 
