@@ -41,6 +41,8 @@ jobs:
         run: moon update
       - name: Install MoonBit dependencies
         run: moon install
+      - name: Check published file list
+        run: python3 scripts/check-package-files.py
       - name: Check formatting and exported interfaces
         run: |
           moon fmt --check
@@ -67,5 +69,5 @@ jobs:
       - name: Compile Android and instrumented test sources; run static lint only
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/29.0.14206865"
-          ./gradlew :host:compileDebugKotlin :host:lintDebug :app:assembleDebug :app:compileDebugAndroidTestKotlin :app:lintDebug --no-daemon --stacktrace
+          ./gradlew :host:checkJniContract :host:lintDebug :app:assembleDebug :app:compileDebugAndroidTestKotlin :app:lintDebug --no-daemon --stacktrace
         working-directory: android

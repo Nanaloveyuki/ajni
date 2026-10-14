@@ -1,5 +1,6 @@
 # Match repository build-output exclusions; publishing uses this instead of .gitignore.
 ref/
+tmp/
 _build/
 .moon/
 android/.gradle/
@@ -10,6 +11,7 @@ android/**/.cxx/
 android/.idea/
 .idea/
 *.iml
+scripts/__pycache__/
 
 # Published Android build scripts read this pin too.
 !/.moon-version
