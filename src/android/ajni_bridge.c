@@ -119,7 +119,7 @@ MOONBIT_FFI_EXPORT void ajni_install_event_callback(
   g_event_context = context;
   g_event_shutting_down = false;
   pthread_mutex_unlock(&g_event_lock);
-  if (old_context != NULL && old_context != context) {
+  if (old_context != NULL) {
     moonbit_decref(old_context);
   }
 #else
@@ -171,7 +171,6 @@ enum {
 
 JavaVM *g_vm = NULL;
 jclass g_bridge_class = NULL;
-static jobject g_class_loader = NULL;
 static ANativeWindow *g_window = NULL;
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t g_idle = PTHREAD_COND_INITIALIZER;
@@ -282,7 +281,7 @@ int32_t ajni_bridge_lease_acquire(AjniBridgeLease *lease) {
 
   jint result = (*lease->vm)->GetEnv(lease->vm, (void **)&lease->env, JNI_VERSION_1_6);
   if (result == JNI_EDETACHED) {
-    result = (*lease->vm)->AttachCurrentThread(lease->vm, (void **)&lease->env, NULL);
+    result = (*lease->vm)->AttachCurrentThread(lease->vm, &lease->env, NULL);
     if (result == JNI_OK) lease->attached = true;
   }
   if (result != JNI_OK || lease->env == NULL) {
@@ -502,42 +501,18 @@ static void ajni_native_initialize(JNIEnv *env, jclass unused, jobject context, 
     ajni_throw_new(env, "java/lang/IllegalArgumentException", "context and runtime generation must be valid");
     return;
   }
-  jclass context_class = (*env)->GetObjectClass(env, context);
-  jobject loader = NULL;
-  jobject global_loader = NULL;
-  if ((*env)->ExceptionCheck(env) || context_class == NULL) goto failure;
-  jmethodID get_loader = (*env)->GetMethodID(env, context_class, "getClassLoader", "()Ljava/lang/ClassLoader;");
-  if ((*env)->ExceptionCheck(env) || get_loader == NULL) goto failure;
-  loader = (*env)->CallObjectMethod(env, context, get_loader);
-  if ((*env)->ExceptionCheck(env) || loader == NULL) goto failure;
-  global_loader = (*env)->NewGlobalRef(env, loader);
-  if ((*env)->ExceptionCheck(env) || global_loader == NULL) goto failure;
   pthread_mutex_lock(&g_lock);
-  jobject old_loader = g_class_loader;
-  g_class_loader = global_loader;
   g_runtime_generation = generation;
   g_was_initialized = true;
   g_initialized = true;
   pthread_mutex_unlock(&g_lock);
-  if (old_loader != NULL) (*env)->DeleteGlobalRef(env, old_loader);
-  (*env)->DeleteLocalRef(env, loader);
-  (*env)->DeleteLocalRef(env, context_class);
-  return;
-failure:
-  if (global_loader != NULL) (*env)->DeleteGlobalRef(env, global_loader);
-  if (loader != NULL) (*env)->DeleteLocalRef(env, loader);
-  if (context_class != NULL) (*env)->DeleteLocalRef(env, context_class);
-  ajni_throw_new(env, "java/lang/IllegalStateException", "Could not initialize Android class loader");
 }
 
 static void ajni_native_shutdown(JNIEnv *env, jclass unused) {
+  (void)env;
   (void)unused;
   pthread_mutex_lock(&g_lock);
   ajni_release_window_locked();
-  if (g_class_loader != NULL) {
-    (*env)->DeleteGlobalRef(env, g_class_loader);
-    g_class_loader = NULL;
-  }
   g_initialized = false;
   g_runtime_generation = 0;
   pthread_mutex_unlock(&g_lock);

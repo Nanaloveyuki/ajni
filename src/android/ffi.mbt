@@ -1,6 +1,6 @@
 ///|
-/// Installs the native-to-MoonBit event trampoline. `callback` is owned by C
-/// until it is replaced or the runtime shuts down.
+/// Each installation transfers one callback reference to C; replacement releases
+/// the old reference, JNI unload releases storage. Ordinary shutdown keeps it.
 #borrow(call_closure)
 #owned(callback)
 extern "C" fn native_install_event_callback(
