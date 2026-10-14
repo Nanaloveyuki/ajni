@@ -6,6 +6,7 @@
 - Add stable-tag release metadata/main-ancestry gates and validated GitHub Releases with source/Android integration ZIPs and SHA-256 checksums; scope weekly dependency updates to GitHub Actions.
 - Add opt-in Mooncakes delivery of the validated source artifact using isolated step credentials, owner-supplied credential JSON, restrictive file permissions and unconditional cleanup.
 - Fix CI installation to select archive `0.10.14+7d59c7ec9`, not the `moon` CLI ID `0.1.20260920` that returns HTTP 403; verify the exact compiler alongside the CLI pin without upgrading either.
+- Request only `platform-tools` from Android SDK setup instead of its obsolete default `tools` package; keep the project's SDK/NDK/CMake versions unchanged.
 
 ## 0.2.6
 
