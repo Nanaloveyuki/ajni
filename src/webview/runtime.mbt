@@ -5,8 +5,8 @@ let handlers : Map[Int, (Event) -> Unit] = Map([])
 let next_handler_id : Ref[Int] = Ref(1)
 
 ///|
-/// Registers a process-wide WebView event observer and returns its removal
-/// token. Register before the Kotlin host emits callbacks.
+/// Registers a process-wide, non-thread-safe observer. Use the main thread or
+/// serialized bootstrap before callbacks; subscriptions survive shutdown/reinit.
 pub fn install_event_handler(handler : (Event) -> Unit) -> Int {
   let id = next_handler_id.val
   next_handler_id.val = id + 1
@@ -15,13 +15,14 @@ pub fn install_event_handler(handler : (Event) -> Unit) -> Int {
 }
 
 ///|
+/// Removes the token from future snapshots, not an already captured snapshot.
 pub fn remove_event_handler(id : Int) -> Unit {
   ignore(handlers.remove(id))
 }
 
 ///|
-/// Creates a WebView in the Kotlin host's attached `FrameLayout` and starts
-/// navigating to `url`. The command is always queued on Android's main Looper.
+/// Creates a WebView with mutually exclusive InitialContent in the attached host.
+/// Main-thread commands run inline, others post; events may precede the return.
 pub fn create(
   handle : Int64,
   trusted_origin : String,
@@ -253,7 +254,8 @@ fn valid_resource_limits(limits : WebViewResourceLimits) -> Bool {
 }
 
 ///|
-/// Stable C export for UTF-8 callbacks from the optional Android WebView stub.
+/// Synchronous UTF-8 export; serialize with observer mutation. Dispatch snapshots
+/// have no order guarantee; nested dispatch takes a fresh snapshot on this thread.
 pub fn dispatch_from_android(
   kind : Int,
   handle : Int64,

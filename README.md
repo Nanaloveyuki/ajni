@@ -55,9 +55,9 @@ UTF-16 lengths or ordinary UTF-8 lengths.
 
 ## Android Runtime
 
-Import `Nanaloveyuki/ajni/android` to install an event handler before the
-Kotlin host forwards Activity or Surface events. The handler returns a token
-that can be removed during shutdown.
+Import `Nanaloveyuki/ajni/android` to install an event handler before the Kotlin
+host forwards events. Handlers are process-wide, non-thread-safe, and require
+main-thread registration/removal/dispatch, or serialized initial bootstrap.
 
 ```moonbit nocheck
 import {
@@ -78,11 +78,25 @@ let subscription = @android.install_event_handler(event => match event {
 Looper. `@android.start_worker()` demonstrates a native-owned thread attaching
 to ART, posting back to the UI thread, then detaching.
 
+Both Android and WebView dispatch capture observer snapshots with no order
+guarantee. Removal affects later snapshots; new observers miss the current event;
+nested dispatch synchronously takes a fresh snapshot. Direct exports/test emitters
+run on the calling thread and must serialize with observer mutation.
+Subscriptions/tokens survive shutdown/reinit until explicit removal. Ordinary
+shutdown does not clear handlers or installation state, wait for active
+calls/handlers, or cancel captured snapshots; admitted callbacks may finish.
+JNI unload separately waits for counted activity and releases native references.
+
 Synchronous failures distinguish `NotInitialized`, `RuntimeDestroyed`,
 `JavaException`, and `NativeFailure`. Outside Android, readiness is false and
 Android/WebView operations raise `NativeFailure` instead of simulated success.
-Ordinary UTF-8 conversion replaces malformed input bytes with U+FFFD; overlong
-encodings, encoded surrogates, and out-of-range scalars are not accepted as text.
+Public `ajni.decode_utf8` is lossy and ignores an initial BOM; WebView event
+decoding is strict, preserves BOM, and drops malformed input. Raw JNI preserves
+NUL by length, paired surrogates as four-byte UTF-8, and replaces isolated Java
+surrogates with U+FFFD. Structured Kotlin fields use the platform UTF-8 encoder
+before JNI, with no U+FFFD-byte guarantee for isolated surrogates. MoonBit encoding
+requires well-formed UTF-16. See the [wire/text contract](src/webview/README.mbt.md#field-wire-and-text-boundaries)
+for canonical fixtures and differing malformed-input tolerance.
 
 ## Android Host
 
@@ -122,9 +136,11 @@ demo ABIs are `arm64-v8a` and `x86_64`.
 
 ## WebView Feature
 
-The WebView host must be attached before `@webview.create`. Commands are queued
-on Android's main Looper when called from another thread. Each view has a
-caller-provided `Int64` handle.
+The WebView host must be attached before `@webview.create`, which loads mutually
+exclusive `InitialContent`. Main-thread commands may execute inline, other callers
+post to the main Looper. Native acceptance is not execution success; events and
+`OperationFailed` may fire before return. Each view has a caller-provided `Int64`
+handle.
 
 ```moonbit nocheck
 import {
@@ -189,6 +205,7 @@ moon fmt --check
 moon check --target native
 moon test --target native --build-only
 moon info --target native
+python3 scripts/check-package-files.py
 ```
 
 Android/WebView runtime testing is currently deferred. Static checks and APK
@@ -196,10 +213,28 @@ compilation do not prove ART, lifecycle, Surface, or WebView behavior. Android
 compilation additionally requires the SDK, NDK `29.0.14206865`, CMake, Java 17,
 and the pinned Gradle `8.10.2` wrapper under `android/`.
 
-CI installs and verifies the MoonBit version in `.moon-version`, compiles tests
-without executing them, builds both configured Android ABIs, and runs Kotlin
-compilation/static lint. The host ships precise JNI consumer keep rules;
-runtime lookup in an R8-minified consumer remains a separate verification step.
+CI verifies the pinned MoonBit version, checks the real frozen publication list,
+compiles tests without executing them, and invokes `:host:checkJniContract` before
+static lint/APK compilation. The JNI gate pairs actual `javap -private -s` method
+blocks with literal C registrations, real native definitions and precise keep
+members, then uses real NDK API24 compilers for both ABIs/export configurations.
+Its C varargs association/count checks do not prove expression types; manual ABI
+review and R8-minified runtime lookup remain separate requirements.
+
+Standalone JNI gate (requires actual compiled Kotlin classes):
+
+```sh
+python3 scripts/check-jni-contract.py --class-dir android/host/build/tmp/kotlin-classes/debug \
+  --ndk "$ANDROID_NDK_HOME" --moon-home "$MOON_HOME"
+```
+
+`.moonignore` independently excludes research `tmp/` and observed Python/build
+caches; `.gitignore` is not the publication policy. The gate requires key public,
+native, Android-wrapper and checker inputs, and rejects incomplete/diagnostic-only
+lists. Local maintenance passed both gates and their negative smoke, native
+build-only tests, both-ABI debug APK compilation and host/app lint. A real checked
+JVM fixture passed 36 JNI assertions, separately from deferred Android/WebView
+runtime validation; see [recorded evidence and deferred scenarios](BUGFIX_PLAN.md#unreleased-维护验收).
 
 The following emulator test command is retained for when runtime testing resumes;
 it is not part of the current validation requirement:

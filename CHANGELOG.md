@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Exclude research `tmp/` and observed Python bytecode cache from MoonBit publication; gate the frozen file list in CI without excluding build scripts.
+- Add an exact JNI bytecode/C/prototype/consumer-rules gate and Gradle task using real API24 NDK compilers for both supported ABIs and export/callback configurations. Fix the Android `AttachCurrentThread` argument to its actual `JNIEnv **` prototype.
+- Release the previous owned callback reference on every replacement, including identical addresses; remove unused classloader retention while preserving initialization ABI.
+- Document observer threads, snapshot reentrancy, shutdown, inline WebView dispatch and canonical wire/text boundaries. Add independent-literal consumer and nested-handler regressions, compiled only.
+- Make all four existing instrumentation tests unconditionally clear observers, shut down and reverse-detach owned containers; relay observer failures to the test thread and assert the production page-message wire literal.
+- Public signatures and support scope remain unchanged. Static gates, build-only regressions, both-ABI debug APK compilation and lint passed. A real `-Xcheck:jni` JVM fixture passed 36 registration/exception/text/upcall/attachment/worker assertions; Android/WebView/refcount/R8 runtime verification remains deferred.
+
 ## 0.2.5
 
 - Fix JNI exception class references and unconditional exception handling; publish Android readiness only after initialization succeeds and propagate existing `JniError` categories.

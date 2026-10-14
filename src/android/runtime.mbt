@@ -22,8 +22,8 @@ fn ensure_callback_installed() -> Unit {
 }
 
 ///|
-/// Registers a process-wide Android event observer and returns its removal
-/// token. Register before Kotlin calls `NativeBridge.initialize`.
+/// Registers a process-wide, non-thread-safe observer. Use the main thread or
+/// serialized bootstrap before callbacks; subscriptions survive shutdown/reinit.
 pub fn install_event_handler(handler : (AndroidEvent) -> Unit) -> Int {
   ensure_callback_installed()
   let id = next_handler_id.val
@@ -33,6 +33,7 @@ pub fn install_event_handler(handler : (AndroidEvent) -> Unit) -> Int {
 }
 
 ///|
+/// Removes the token from future snapshots, not an already captured snapshot.
 pub fn remove_event_handler(id : Int) -> Unit {
   ignore(handlers.remove(id))
 }
@@ -69,15 +70,14 @@ pub fn runtime_ready() -> Bool {
 }
 
 ///|
-/// Emits a bridge event for host-side tests and integration harnesses.
+/// Synchronously emits on the calling thread; serialize with registration/removal.
 pub fn emit_for_test(kind : Int, first : Int, second : Int) -> Unit {
   native_emit_for_test(kind, first, second)
 }
 
 ///|
-/// Stable C export used by the Android JNI bridge. Applications embedding the
-/// MoonBit native artifact link this symbol as `ajni_dispatch_event`; callers
-/// must still install their own event handler to observe the event payload.
+/// Synchronous export linked as `ajni_dispatch_event`; serialize with observer
+/// mutation. Dispatch snapshots have no order guarantee; nested dispatch is fresh.
 pub fn dispatch_from_android(kind : Int, first : Int, second : Int) -> Unit {
   dispatch_native_event(kind, first, second)
 }

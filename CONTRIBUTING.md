@@ -57,6 +57,7 @@ moon fmt --check
 moon check --target native
 moon test --target native --build-only
 moon info --target native
+python3 scripts/check-package-files.py
 ```
 
 For Android JNI, Kotlin host, CMake, or ABI fixes, compile the demo only when
@@ -67,12 +68,37 @@ platform runtime test:
 .\scripts\build-android.ps1
 ```
 
-Do not require device/emulator instrumentation, WebView UI smoke, or checked-JVM
-runtime scenarios during this maintenance period. Compile existing tests without
-executing them. Non-Android operations report unsupported failures, not simulated
-ART/WebView success. Record static checks and compilation separately from deferred
-runtime verification. GitHub Actions compiles Android and instrumented-test
-sources, builds `arm64-v8a` and `x86_64`, and runs static lint without devices.
+For the full static Android acceptance, set `ANDROID_HOME`, `ANDROID_NDK_HOME`
+and `MOON_HOME`, then run:
+
+```sh
+./android/gradlew -p android :host:checkJniContract :host:lintDebug \
+  :app:assembleDebug :app:compileDebugAndroidTestKotlin :app:lintDebug --no-daemon --stacktrace
+```
+
+`checkJniContract` depends on typed `compileDebugKotlin` and its output provider,
+uses actual bytecode without class initialization, and compiles temporary TUs
+including real stubs with NDK API24 drivers (`arm64-v8a`/`x86_64`, production and
+exports-disabled callback branches). The standalone CLI requires `--class-dir`,
+`--ndk`, `--moon-home`; exit 2 means missing prerequisites, exit 1 a contract,
+parsing or compilation failure. Do not substitute host headers or fake refcounts.
+JNI varargs expression types still need manual review; keep rules do not prove
+R8-minified lookup. Checker smoke may mutate temporary copies/captured javap,
+never production source. Package checks use `moon package --list --frozen` after
+dependency installation, consume both output streams, and fail on missing inputs.
+
+Android/WebView device/emulator/runtime scenarios remain deferred. Real Java JNI
+checks may run separately when authorized, with JVM version, actual C paths and
+fixture limitations recorded; they do not validate production Kotlin or ART.
+Compile MoonBit and instrumentation tests without executing them. Non-Android
+operations report unsupported failures, not simulated ART/WebView success.
+GitHub Actions compiles both ABIs/test sources and runs static lint without devices.
+
+Keep observer mutation/main-thread contracts and snapshot reentrancy intact;
+subscriptions survive ordinary shutdown. Instrumentation cleanup must clear the
+observer, shut down, and reverse-detach tracked containers even after failures.
+The Kotlin observer fires before JNI and is not end-to-end MoonBit evidence.
+Current exercised checks and deferred scenarios are recorded in `BUGFIX_PLAN.md`.
 
 Update `README.md`, package `README.mbt.md` files, generated public interfaces,
 and tests whenever observable behavior changes. Do not commit `_build`,
