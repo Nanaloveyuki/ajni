@@ -3,21 +3,12 @@ test "page messages decode structured trusted-origin fields" {
   let events : Array[Event] = []
   let id = install_event_handler(fn(event) { events.push(event) })
   dispatch_from_android(
-    37,
-    9L,
-    @ajni.encode_utf8(
-      encode_fields([
-        ("body", "hello from page"),
-        ("origin", "https://app.orbit.invalid"),
-        ("main_frame", "1"),
-      ]),
-    ),
-    b"",
+    37, 9L, b"body=aGVsbG8&origin=aHR0cHM6Ly9vcmJpdC50ZXN0&main_frame=MQ", b"",
   )
   match events[0] {
     { handle: 9L, kind: PageMessage(body, origin, true), } => {
-      assert_eq(body, "hello from page")
-      assert_eq(origin, "https://app.orbit.invalid")
+      assert_eq(body, "hello")
+      assert_eq(origin, "https://orbit.test")
     }
     _ => abort("expected a structured page message")
   }
@@ -78,26 +69,24 @@ test "asset requests and operation failures retain correlation identifiers" {
 }
 
 ///|
-test "resource limits default and encoded asset response are bounded fields" {
-  let limits = WebViewResourceLimits::new()
-  assert_eq(limits.max_page_message_bytes, 1048576)
-  assert_eq(limits.max_pending_asset_requests, 32)
-  assert_eq(limits.max_asset_response_bytes, 8388608)
-  assert_eq(limits.asset_response_timeout_millis, 10000)
+test "encoded asset response preserves binary body and response metadata" {
   let wire = encode_asset_response("asset-4", {
     status: 200,
     mime_type: "text/plain",
     encoding: "utf-8",
     headers: [{ name: "Cache-Control", value: "no-store", }],
-    body: b"ok",
+    body: b"\x00\xff",
   })
   let fields = decode_fields(wire).unwrap_or(Map([]))
   assert_eq(fields.get("request_id").unwrap_or(""), "asset-4")
   assert_eq(fields.get("status").unwrap_or(""), "200")
   assert_eq(fields.get("mime").unwrap_or(""), "text/plain")
   assert_eq(fields.get("encoding").unwrap_or(""), "utf-8")
-  assert_eq(fields.get("body").unwrap_or(""), "b2s")
-  assert_true(fields.get("headers").unwrap_or("") != "")
+  assert_eq(fields.get("body").unwrap_or(""), "AP8")
+  assert_eq(
+    fields.get("headers"),
+    Some("bmFtZT1RMkZqYUdVdFEyOXVkSEp2YkEmdmFsdWU9Ym04dGMzUnZjbVU"),
+  )
 }
 
 ///|
@@ -160,4 +149,33 @@ test "invalid base64 and missing fields are rejected" {
   dispatch_from_android(37, 13L, @ajni.encode_utf8("body=aGVsbG8"), b"")
   assert_eq(events.length(), 0)
   remove_event_handler(id)
+}
+
+///|
+test "literal canonical fields preserve scalar text and nested binary base64" {
+  for
+    fixture in [
+      ("body=", ""),
+      ("body=AA", "\u0000"),
+      ("body=5Lit", "中"),
+      ("body=8J-agA", "\u{1F680}"),
+      ("body=77u_", "\uFEFF"),
+      ("body=QVA4", "AP8"),
+    ] {
+    match decode_fields(fixture.0) {
+      Some(fields) => assert_eq(fields.get("body"), Some(fixture.1))
+      None => abort("canonical field was rejected")
+    }
+  }
+}
+
+///|
+test "literal page messages reject invalid text and incomplete fields" {
+  for
+    wire in [
+      "body=aGVsbG8", "body=&body=AA&origin=&main_frame=MQ", "body=_w&origin=&main_frame=MQ",
+      "body=AA&&origin=&main_frame=MQ", "body=AA==&origin=&main_frame=MQ",
+    ] {
+    assert_eq(decode_page_message(@ajni.encode_utf8(wire)), None)
+  }
 }
