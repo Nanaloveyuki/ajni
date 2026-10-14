@@ -1,0 +1,29 @@
+name: Setup pinned MoonBit
+description: Install the Linux toolchain pinned in .moon-version and its dependencies.
+
+runs:
+  using: composite
+  steps:
+    - name: Install pinned MoonBit
+      shell: bash --noprofile --norc -euo pipefail {0}
+      run: |
+        [[ "$RUNNER_OS" == Linux ]]
+        read -r moon_version < .moon-version
+        curl -fsSL https://cli.moonbitlang.com/install/unix.sh -o "$RUNNER_TEMP/moonbit-install.sh"
+        bash "$RUNNER_TEMP/moonbit-install.sh" "$moon_version"
+        echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+        echo "MOON_HOME=$HOME/.moon" >> "$GITHUB_ENV"
+    - name: Verify pinned MoonBit version
+      shell: bash --noprofile --norc -euo pipefail {0}
+      run: |
+        read -r moon_version < .moon-version
+        installed_version="$(moon version)"
+        printf '%s\n' "$installed_version"
+        [[ "$installed_version" == "moon $moon_version ("* ]]
+        moon version --all
+    - name: Update MoonBit registry
+      shell: bash --noprofile --norc -euo pipefail {0}
+      run: moon update
+    - name: Install MoonBit dependencies
+      shell: bash --noprofile --norc -euo pipefail {0}
+      run: moon install

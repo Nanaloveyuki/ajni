@@ -8,39 +8,30 @@ on:
     branches:
       - main
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ajni-build-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash --noprofile --norc -euo pipefail {0}
+
 jobs:
-  checks:
+  moonbit:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - name: Install MoonBit
-        run: |
-          set -euo pipefail
-          read -r moon_version < .moon-version
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh -o "$RUNNER_TEMP/moonbit-install.sh"
-          bash "$RUNNER_TEMP/moonbit-install.sh" "$moon_version"
-          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
-          echo "MOON_HOME=$HOME/.moon" >> "$GITHUB_ENV"
-      - name: Verify pinned MoonBit version
-        run: |
-          read -r moon_version < .moon-version
-          installed_version="$(moon version)"
-          printf '%s\n' "$installed_version"
-          [[ "$installed_version" == "moon $moon_version ("* ]]
-          moon version --all
-      - name: Update MoonBit registry
-        run: moon update
-      - name: Install MoonBit dependencies
-        run: moon install
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup pinned MoonBit
+        uses: ./.github/actions/setup-moonbit
       - name: Check published file list
         run: python3 scripts/check-package-files.py
       - name: Check formatting and exported interfaces
@@ -52,22 +43,89 @@ jobs:
         run: |
           moon check --target native
           moon test --target native --build-only
-      - uses: actions/setup-java@v4
+      - name: Package module and generate API documentation
+        run: |
+          moon package --frozen
+          moon doc --frozen
+      - name: Upload module package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ajni-package
+          path: _build/publish/*.zip
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload API documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: ajni-api-docs
+          path: _build/doc/
+          if-no-files-found: error
+          retention-days: 14
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup pinned MoonBit
+        uses: ./.github/actions/setup-moonbit
+      - name: Setup JDK
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - name: Install Android native build tools
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install pinned Android native build tools
         run: sdkmanager "platforms;android-35" "build-tools;36.1.0" "cmake;4.1.2" "ndk;29.0.14206865"
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Setup Gradle and validate wrapper
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          validate-wrappers: true
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
       - name: Verify pinned Gradle wrapper version
         run: |
           installed_version="$(./gradlew --version)"
           printf '%s\n' "$installed_version"
           [[ "$installed_version" == *$'\nGradle 8.10.2\n'* ]]
         working-directory: android
-      - name: Compile Android and instrumented test sources; run static lint only
+      - name: Build Android artifacts and instrumented tests; run static lint only
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/29.0.14206865"
-          ./gradlew :host:checkJniContract :host:lintDebug :app:assembleDebug :app:compileDebugAndroidTestKotlin :app:lintDebug --no-daemon --stacktrace
+          ./gradlew :host:checkJniContract :host:lintDebug :host:assembleDebug :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --no-daemon --stacktrace
         working-directory: android
+      - name: Upload Android debug artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ajni-android-debug
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            android/host/build/outputs/aar/host-debug.aar
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload Android diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ajni-android-reports
+          path: android/**/build/reports/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  ci:
+    if: always()
+    needs: [moonbit, android]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require all validation jobs to succeed
+        env:
+          MOONBIT_RESULT: ${{ needs.moonbit.result }}
+          ANDROID_RESULT: ${{ needs.android.result }}
+        run: |
+          printf 'MoonBit: %s\nAndroid: %s\n' "$MOONBIT_RESULT" "$ANDROID_RESULT"
+          [[ "$MOONBIT_RESULT" == success && "$ANDROID_RESULT" == success ]]

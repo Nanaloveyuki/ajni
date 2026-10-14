@@ -1,0 +1,134 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ajni-release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash --noprofile --norc -euo pipefail {0}
+
+jobs:
+  metadata:
+    name: Release metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate tag, changelog and main ancestry
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 scripts/check-release.py --tag "$RELEASE_TAG"
+          git merge-base --is-ancestor HEAD origin/main
+
+  build:
+    name: Release validation
+    needs: metadata
+    uses: ./.github/workflows/build.yml
+
+  github-release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: ajni-package
+          path: release/package
+      - uses: actions/download-artifact@v4
+        with:
+          name: ajni-android-debug
+          path: release/android
+      - name: Prepare release assets and notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 scripts/check-release.py --tag "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md"
+          cat >> "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+
+          ## Artifacts and validation limits
+
+          The MoonBit source ZIP is the package produced by the pinned toolchain.
+          The Android ZIP contains a debug demo APK, an instrumentation APK and the
+          reusable host AAR; these are integration artifacts, not production-signed apps.
+          Native checks, compile-only tests, real NDK JNI checks and Android lint/builds
+          passed. Android/WebView device runtime validation remains deferred.
+          NOTES
+          mkdir -p release/assets
+          cp release/package/*.zip release/assets/
+          (cd release/android && zip -r "../assets/ajni-android-debug-${RELEASE_TAG}.zip" .)
+          (cd release/assets && sha256sum *.zip > SHA256SUMS)
+      - name: Create release without replacing existing releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" release/assets/* \
+            --verify-tag --title "ajni ${RELEASE_TAG#v}" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
+
+  mooncakes:
+    name: Publish Mooncakes package
+    if: vars.MOONCAKES_PUBLISH == 'true'
+    needs: github-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup pinned MoonBit
+        uses: ./.github/actions/setup-moonbit
+      - uses: actions/download-artifact@v4
+        with:
+          name: ajni-package
+          path: ${{ runner.temp }}/ajni-package
+      - name: Publish the validated source archive
+        env:
+          MOONCAKES_CREDENTIALS: ${{ secrets.MOONCAKES_CREDENTIALS }}
+        run: |
+          umask 077
+          trap 'rm -f "$MOON_HOME/credentials.json"' EXIT
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          try:
+              credentials = json.loads(os.environ['MOONCAKES_CREDENTIALS'])
+              assert isinstance(credentials, dict)
+              assert isinstance(credentials.get('token'), str) and credentials['token'].strip()
+              assert credentials.get('username') is None or isinstance(credentials['username'], str)
+          except (KeyError, ValueError, AssertionError):
+              raise SystemExit('MOONCAKES_CREDENTIALS must be credential JSON with a nonempty token string')
+          credential_file = Path(os.environ['MOON_HOME']) / 'credentials.json'
+          credential_file.write_text(json.dumps(credentials), encoding='utf-8')
+          credential_file.chmod(0o600)
+          PY
+          unset MOONCAKES_CREDENTIALS
+          source_dir="$(mktemp -d "$RUNNER_TEMP/ajni-publish.XXXXXX")"
+          unzip -q "$RUNNER_TEMP"/ajni-package/*.zip -d "$source_dir"
+          cd "$source_dir"
+          moon publish --frozen
+      - name: Remove registry credentials
+        if: always()
+        run: rm -f "$MOON_HOME/credentials.json"

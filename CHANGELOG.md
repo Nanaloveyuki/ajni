@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Split reusable CI into MoonBit and Android jobs with an aggregate gate, shared pinned toolchain setup, Gradle wrapper validation/read-only PR caches, and retained package/API/APK/AAR/lint artifacts. Keep tests compile-only.
+- Add stable-tag release metadata/main-ancestry gates and validated GitHub Releases with source/Android integration ZIPs and SHA-256 checksums; scope weekly dependency updates to GitHub Actions.
+- Add opt-in Mooncakes delivery of the validated source artifact using isolated step credentials, owner-supplied credential JSON, restrictive file permissions and unconditional cleanup.
+
 ## 0.2.6
 
 - Exclude research `tmp/` and observed Python bytecode cache from MoonBit publication; gate the frozen file list in CI without excluding build scripts.

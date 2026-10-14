@@ -246,9 +246,31 @@ $env:ANDROID_SERIAL = "emulator-5554"
 .\android\gradlew.bat -p android :app:connectedDebugAndroidTest
 ```
 
-The GitHub workflow builds the Android demo for both configured ABIs but does
-not execute instrumentation tests. Record platform runtime verification as
-deferred, not passed, while only static checks or compilation are available.
+The GitHub workflow builds both configured ABIs and packages instrumentation tests
+without executing them. Record platform runtime verification as deferred, not
+passed, while only static checks or compilation are available.
+
+## CI And Releases
+
+`Build` runs on `main` pushes, pull requests to `main`, and manual dispatch.
+Independent MoonBit and Android jobs feed the required `ci` gate. Each successful
+run retains the MoonBit source ZIP and Android debug APK/instrumentation APK/host
+AAR for 30 days; API documentation data and Android lint reports for 14 days.
+API data comes from `moon doc`, not a deployed documentation website.
+
+Pushing a new stable `vX.Y.Z` tag triggers `Release`. The tag must match
+`moon.mod`, have a nonempty matching changelog section, and point to a commit in
+`main` history. Release reuses all Build checks, then creates a GitHub Release
+with source/Android ZIPs and `SHA256SUMS`. Existing releases are never overwritten.
+Android assets are debug integration builds, not production-signed applications.
+See [CONTRIBUTING.md](CONTRIBUTING.md#release-process) for maintainer commands.
+
+Optional Mooncakes delivery publishes the validated source artifact after the
+GitHub Release. Enable `MOONCAKES_PUBLISH=true` and configure the
+`MOONCAKES_CREDENTIALS` Actions secret as described in
+[the registry setup instructions](CONTRIBUTING.md#optional-mooncakes-publishing).
+Without that configuration, GitHub Releases remain usable and registry delivery
+is skipped.
 
 ## Contributing
 
