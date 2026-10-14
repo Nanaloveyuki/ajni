@@ -8,9 +8,9 @@ runs:
       shell: bash --noprofile --norc -euo pipefail {0}
       run: |
         [[ "$RUNNER_OS" == Linux ]]
-        read -r moon_version < .moon-version
+        # Archives use the compiler release, not the moon CLI version in .moon-version.
         curl -fsSL https://cli.moonbitlang.com/install/unix.sh -o "$RUNNER_TEMP/moonbit-install.sh"
-        bash "$RUNNER_TEMP/moonbit-install.sh" "$moon_version"
+        bash "$RUNNER_TEMP/moonbit-install.sh" "0.10.14+7d59c7ec9"
         echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
         echo "MOON_HOME=$HOME/.moon" >> "$GITHUB_ENV"
     - name: Verify pinned MoonBit version
@@ -20,6 +20,9 @@ runs:
         installed_version="$(moon version)"
         printf '%s\n' "$installed_version"
         [[ "$installed_version" == "moon $moon_version ("* ]]
+        installed_compiler_version="$(moonc -v)"
+        printf '%s\n' "$installed_compiler_version"
+        [[ "$installed_compiler_version" == "v0.10.14+7d59c7ec9 (2026-09-18)" ]]
         moon version --all
     - name: Update MoonBit registry
       shell: bash --noprofile --norc -euo pipefail {0}

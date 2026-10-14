@@ -20,9 +20,12 @@ static acceptance criteria; reconsider feature expansion after 1.0.
 
 ## Development Setup
 
-Install the MoonBit version in `.moon-version` and Java 17. Android build work
-additionally needs Android SDK platform 35, platform tools, NDK `29.0.14206865`,
-CMake `4.1.2`, and the bundled Gradle `8.10.2` wrapper.
+Install toolchain archive `0.10.14+7d59c7ec9` and Java 17. Its `moon` CLI version
+is `0.1.20260920`, recorded in `.moon-version`; archive IDs are compiler versions,
+not CLI versions. For Linux/macOS, pass `0.10.14+7d59c7ec9` to the official
+installer. Android build work additionally needs Android SDK platform 35,
+platform tools, NDK `29.0.14206865`, CMake `4.1.2`, and the bundled Gradle
+`8.10.2` wrapper.
 
 Set `ANDROID_NDK_HOME` when the NDK is not discoverable through Android Studio:
 
@@ -116,7 +119,8 @@ and tests whenever observable behavior changes. Do not commit `_build`,
 
 ## CI Infrastructure
 
-`.github/actions/setup-moonbit` installs and verifies `.moon-version` on Linux.
+`.github/actions/setup-moonbit` installs the compiler-versioned archive on Linux
+and verifies both the `.moon-version` CLI pin and exact compiler version.
 `Build` separates MoonBit/package checks from Android JNI/lint/build checks;
 the always-running `ci` job fails if either job fails, is cancelled, or is skipped.
 Configure branch protection to require `ci` (replacing the former `checks` job)

@@ -5,6 +5,7 @@
 - Split reusable CI into MoonBit and Android jobs with an aggregate gate, shared pinned toolchain setup, Gradle wrapper validation/read-only PR caches, and retained package/API/APK/AAR/lint artifacts. Keep tests compile-only.
 - Add stable-tag release metadata/main-ancestry gates and validated GitHub Releases with source/Android integration ZIPs and SHA-256 checksums; scope weekly dependency updates to GitHub Actions.
 - Add opt-in Mooncakes delivery of the validated source artifact using isolated step credentials, owner-supplied credential JSON, restrictive file permissions and unconditional cleanup.
+- Fix CI installation to select archive `0.10.14+7d59c7ec9`, not the `moon` CLI ID `0.1.20260920` that returns HTTP 403; verify the exact compiler alongside the CLI pin without upgrading either.
 
 ## 0.2.6
 
