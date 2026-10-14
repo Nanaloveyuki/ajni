@@ -234,7 +234,7 @@ native, Android-wrapper and checker inputs, and rejects incomplete/diagnostic-on
 lists. Local maintenance passed both gates and their negative smoke, native
 build-only tests, both-ABI debug APK compilation and host/app lint. A real checked
 JVM fixture passed 36 JNI assertions, separately from deferred Android/WebView
-runtime validation; see [recorded evidence and deferred scenarios](BUGFIX_PLAN.md#unreleased-维护验收).
+runtime validation; see [recorded evidence and deferred scenarios](BUGFIX_PLAN.md#026-维护验收).
 
 The following emulator test command is retained for when runtime testing resumes;
 it is not part of the current validation requirement:

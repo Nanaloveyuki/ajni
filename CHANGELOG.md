@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.6
 
 - Exclude research `tmp/` and observed Python bytecode cache from MoonBit publication; gate the frozen file list in CI without excluding build scripts.
 - Add an exact JNI bytecode/C/prototype/consumer-rules gate and Gradle task using real API24 NDK compilers for both supported ABIs and export/callback configurations. Fix the Android `AttachCurrentThread` argument to its actual `JNIEnv **` prototype.

@@ -230,9 +230,9 @@ Gradle 使用项目要求的 8.10.2。安装 Gradle 不会提供 Android SDK pla
 
 审查 JNI 修改时逐一核对：prototype、static/instance ABI、异常状态、引用创建/释放、attach ownership 和失败出口。审查 Kotlin 修改时核对：主线程契约、初始化发布顺序、旧任务身份、创建回滚，以及 pending future 的唯一终结。
 
-暂不执行 connected tests、模拟器/真机测试、WebView UI/renderer smoke、checked JVM 动态场景或以 mock/host 成功替代平台验证。后续恢复动态验证时，按条目补失败场景，不把当前静态验收升级为完整行为验证。
+暂不执行 connected tests、模拟器/真机测试、WebView UI/renderer smoke，不以 mock/host 或桌面 JVM 成功替代平台验证。真实 checked-JVM 独立场景按用户授权执行并记录边界；后续恢复 Android 动态验证时逐项补证据。
 
-0.2.5 历史静态结果（不是下述 Unreleased 验收）：
+0.2.5 历史静态结果（不是下述 0.2.6 验收）：
 
 - `moon fmt --check`、`moon check --target native`、`moon test --target native --build-only`、`moon info --target native` 成功。测试未执行。保留一个 `unused_package` warning：WebView 不再调用 Android 的 ready 预检查，但仍必须依赖其 native stub 来链接共享 lease/error 符号；没有删除该依赖或禁用 warning。
 - 使用项目 Kotlin 2.0.21 compiler、官方 Android 35 `android.jar`、WebKit 1.12.1 及既有 test 依赖直接编译实际 host 和仪器测试源码，均成功。`javap -private -s` 核对私有 JNI static 签名；未加载 NativeBridge 或运行测试。
@@ -241,7 +241,7 @@ Gradle 使用项目要求的 8.10.2。安装 Gradle 不会提供 Android SDK pla
 - bundled `./gradlew --version` 实际运行并显示 8.10.2。Gradle Android compile task 在配置阶段报告 `SDK location not found`；本机缺完整 SDK/NDK，APK、lint、R8 和双 ABI native 构建未通过验收。未运行设备、模拟器、checked JVM 或 WebView 动态场景。
 
 
-## Unreleased 维护验收
+## 0.2.6 维护验收
 
 | 维护项 | 已实施决定 | 证据边界 |
 | --- | --- | --- |

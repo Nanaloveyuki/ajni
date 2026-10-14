@@ -1,6 +1,6 @@
 name = "Nanaloveyuki/ajni"
 
-version = "0.2.5"
+version = "0.2.6"
 
 description = "Android JNI runtime primitives and MoonBit lifecycle bridge."
 
