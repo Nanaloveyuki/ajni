@@ -12,6 +12,9 @@ android/.idea/
 .idea/
 *.iml
 scripts/__pycache__/
+tests/**/.mooncakes/
+tests/**/_build/
+tests/**/__pycache__/
 
 # Published Android build scripts read this pin too.
 !/.moon-version

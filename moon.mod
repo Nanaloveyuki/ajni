@@ -2,7 +2,7 @@ name = "Nanaloveyuki/ajni"
 
 version = "0.2.6"
 
-description = "Android JNI runtime primitives and MoonBit lifecycle bridge."
+description = "Checked bidirectional Java/MoonBit JNI runtime and Android host bridge."
 
 repository = "https://github.com/Nanaloveyuki/ajni"
 
@@ -15,3 +15,7 @@ keywords = [ "moonbit", "android", "jni", "ndk" ]
 preferred_target = "native"
 
 source = "src"
+
+import {
+  "Nanaloveyuki/dynlib@0.2.1",
+}

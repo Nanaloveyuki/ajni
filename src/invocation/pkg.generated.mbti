@@ -1,0 +1,27 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Nanaloveyuki/ajni/invocation"
+
+import {
+  "Nanaloveyuki/ajni/runtime",
+  "Nanaloveyuki/dynlib",
+}
+
+// Values
+pub fn create(String, ArrayView[String]) -> @runtime.Session raise
+
+// Errors
+pub(all) suberror InvocationError {
+  InvalidLibraryPath
+  InvalidOption(String)
+  LoadFailed(@dynlib.DynlibError)
+  ResolveFailed(@dynlib.DynlibError)
+  AlreadyAttempted
+  CreateFailed(Int)
+  OutOfMemory
+}
+
+// Types and methods
+
+// Type aliases
+
+// Traits
