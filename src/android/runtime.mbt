@@ -22,8 +22,8 @@ fn ensure_callback_installed() -> Unit {
 }
 
 ///|
-/// Registers a process-wide, non-thread-safe observer. Use the main thread or
-/// serialized bootstrap before callbacks; subscriptions survive shutdown/reinit.
+/// Registers a process-wide, non-thread-safe observer. Use the runtime owner
+/// thread; subscriptions survive Android feature shutdown/reinitialization.
 pub fn install_event_handler(handler : (AndroidEvent) -> Unit) -> Int {
   ensure_callback_installed()
   let id = next_handler_id.val
@@ -70,14 +70,14 @@ pub fn runtime_ready() -> Bool {
 }
 
 ///|
-/// Synchronously emits on the calling thread; serialize with registration/removal.
+/// Synchronously emits on the calling owner thread.
 pub fn emit_for_test(kind : Int, first : Int, second : Int) -> Unit {
   native_emit_for_test(kind, first, second)
 }
 
 ///|
-/// Synchronous export linked as `ajni_dispatch_event`; serialize with observer
-/// mutation. Dispatch snapshots have no order guarantee; nested dispatch is fresh.
+/// Synchronous export linked as `ajni_dispatch_event`; callers must be on the
+/// runtime owner. Snapshots have no order guarantee; nested dispatch is fresh.
 pub fn dispatch_from_android(kind : Int, first : Int, second : Int) -> Unit {
   dispatch_native_event(kind, first, second)
 }

@@ -2,12 +2,14 @@ package dev.nanaloveyuki.ajni.demo
 
 import android.widget.FrameLayout
 import android.util.Base64
+import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.nanaloveyuki.ajni.host.AjniWebViewHost
 import dev.nanaloveyuki.ajni.host.NativeBridge
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CountDownLatch
@@ -40,6 +42,137 @@ class NativeBridgeInstrumentedTest {
       attempt { ownedContainers.clear() }
     }
     failure?.let { throw it }
+  }
+
+  @Test
+  fun handledObserverJavaErrorDoesNotEscapeVoidDispatch() {
+    val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+    instrumentation.runOnMainSync {
+      NativeBridge.initialize(ApplicationProvider.getApplicationContext())
+      assertTrue(NativeBridge.handledObserverErrorForTesting())
+      val callback = NativeBridge.createIntCallbackForTesting()
+      try {
+        assertEquals(4, callback.invoke(4))
+      } finally {
+        callback.close()
+      }
+    }
+  }
+
+  @Test
+  fun genericCallbackSurvivesActivityScenarioRecreation() {
+    val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+    ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+      var callback: dev.nanaloveyuki.ajni.AjniCallback? = null
+      var originalActivity: MainActivity? = null
+      try {
+        scenario.onActivity { activity ->
+          originalActivity = activity
+          assertEquals(androidx.lifecycle.Lifecycle.State.RESUMED, activity.lifecycle.currentState)
+          val created = NativeBridge.createIntCallbackForTesting()
+          callback = created
+          assertEquals(12, created.invoke(12))
+        }
+        scenario.recreate()
+        scenario.onActivity { activity ->
+          assertNotSame("ActivityScenario must replace the Activity instance", originalActivity, activity)
+          assertEquals(androidx.lifecycle.Lifecycle.State.RESUMED, activity.lifecycle.currentState)
+          val root = activity.findViewById<android.view.ViewGroup>(android.R.id.content).getChildAt(0)
+          assertTrue("recreated Activity UI must be attached", root.isAttachedToWindow)
+          val recreatedUi = root as android.widget.LinearLayout
+          assertEquals(3, recreatedUi.childCount)
+          assertEquals("Start native worker", (recreatedUi.getChildAt(2) as android.widget.Button).text.toString())
+          NativeBridge.startWorker()
+          val retained = checkNotNull(callback)
+          assertEquals("the original generic session and closure state must survive recreation", 19, retained.invoke(7))
+          val fresh = NativeBridge.createIntCallbackForTesting()
+          try {
+            assertEquals(2, fresh.invoke(2))
+          } finally {
+            fresh.close()
+          }
+          assertEquals(20, retained.invoke(1))
+        }
+      } finally {
+        instrumentation.runOnMainSync { callback?.close() }
+      }
+    }
+  }
+
+  @Test
+  fun genericCallbackPreservesOwnerStateAcrossFeatureRecreation() {
+    val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+    val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+    lateinit var callback: dev.nanaloveyuki.ajni.AjniCallback
+    instrumentation.runOnMainSync {
+      NativeBridge.initialize(context)
+      callback = NativeBridge.createIntCallbackForTesting()
+      assertEquals(3, callback.invoke(3))
+      assertEquals(7, callback.invoke(4))
+    }
+    try {
+      val foreignFailure = AtomicReference<Throwable?>(null)
+      val worker = Thread {
+        try {
+          callback.invoke(100)
+        } catch (error: Throwable) {
+          foreignFailure.set(error)
+        }
+      }
+      worker.start()
+      worker.join(2000)
+      assertFalse("callback worker blocked waiting for the owner", worker.isAlive)
+      assertTrue("foreign callback must reject before managed dispatch", foreignFailure.get() is IllegalStateException)
+      instrumentation.runOnMainSync {
+        assertEquals(8, callback.invoke(1))
+        NativeBridge.lifecycle(NativeBridge.LIFECYCLE_PAUSED)
+        NativeBridge.shutdown()
+        assertEquals(10, callback.invoke(2))
+        NativeBridge.initialize(context)
+        NativeBridge.lifecycle(NativeBridge.LIFECYCLE_RESUMED)
+        assertEquals(15, callback.invoke(5))
+      }
+      val closeWorker = Thread { callback.close() }
+      closeWorker.start()
+      closeWorker.join(2000)
+      assertFalse("callback close blocked waiting for the owner", closeWorker.isAlive)
+      instrumentation.runOnMainSync {
+        var rejected = false
+        try {
+          callback.invoke(1)
+        } catch (_: IllegalStateException) {
+          rejected = true
+        }
+        assertTrue("closed callback token must be rejected", rejected)
+      }
+    } finally {
+      instrumentation.runOnMainSync { callback.close() }
+    }
+  }
+
+  @Test
+  fun wrongThreadNativeFeatureDispatchIsRejected() {
+    val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+    instrumentation.runOnMainSync { NativeBridge.initialize(ApplicationProvider.getApplicationContext()) }
+    val cases = listOf(
+      Triple("nativeInitialize", arrayOf<Class<*>>(android.content.Context::class.java, java.lang.Long.TYPE),
+        arrayOf<Any>(ApplicationProvider.getApplicationContext<android.content.Context>(), 1L)),
+      Triple("nativeLifecycle", arrayOf<Class<*>>(java.lang.Integer.TYPE), arrayOf<Any>(NativeBridge.LIFECYCLE_STARTED)),
+      Triple("nativeWebViewEvent", arrayOf<Class<*>>(java.lang.Integer.TYPE, java.lang.Long.TYPE, String::class.java, String::class.java),
+        arrayOf<Any>(1, 1L, "payload", "detail")),
+      Triple("nativeCreateIntCallback", emptyArray<Class<*>>(), emptyArray<Any>()),
+    )
+    for ((name, types, arguments) in cases) {
+      val method = NativeBridge::class.java.getDeclaredMethod(name, *types)
+      method.isAccessible = true
+      var rejected = false
+      try {
+        method.invoke(null, *arguments)
+      } catch (error: java.lang.reflect.InvocationTargetException) {
+        rejected = error.cause is IllegalStateException
+      }
+      assertTrue("$name must reject non-owner JNI entry", rejected)
+    }
   }
 
   @Test

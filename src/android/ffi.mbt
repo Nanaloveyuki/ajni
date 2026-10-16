@@ -1,6 +1,6 @@
 ///|
 /// Each installation transfers one callback reference to C; replacement releases
-/// the old reference, JNI unload releases storage. Ordinary shutdown keeps it.
+/// the old reference. Feature shutdown keeps process subscriptions intact.
 #borrow(call_closure)
 #owned(callback)
 extern "C" fn native_install_event_callback(

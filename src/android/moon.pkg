@@ -1,5 +1,6 @@
 import {
   "Nanaloveyuki/ajni",
+  "Nanaloveyuki/ajni/runtime", // Required native linkage for shared JNI runtime symbols.
 }
 
 import {

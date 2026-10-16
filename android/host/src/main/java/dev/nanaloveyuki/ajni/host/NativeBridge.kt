@@ -26,7 +26,10 @@ object NativeBridge {
 
   fun initialize(context: Context) {
     requireMainThread("initialize")
-    if (runtimeGeneration != 0L) return
+    if (runtimeGeneration != 0L) {
+      nativeInitialize(context.applicationContext, runtimeGeneration)
+      return
+    }
     check(!runtimeTransition) { "NativeBridge lifecycle transition is in progress" }
     val generation = nextRuntimeGeneration++
     check(generation > 0L) { "NativeBridge runtime generation exhausted" }
@@ -94,6 +97,11 @@ object NativeBridge {
   }
 
   fun echo(value: String): String = nativeEcho(value)
+
+  fun createIntCallbackForTesting(): dev.nanaloveyuki.ajni.AjniCallback =
+    nativeCreateIntCallback()
+
+  fun handledObserverErrorForTesting(): Boolean = nativeHandledObserverError()
 
   fun attachWebViewContainer(container: FrameLayout) {
     AjniWebViewHost.attach(container)
@@ -177,5 +185,7 @@ object NativeBridge {
   @JvmStatic private external fun nativeOnUiTask(eventKind: Int)
   @JvmStatic private external fun nativeStartWorker()
   @JvmStatic private external fun nativeEcho(value: String): String
+  @JvmStatic private external fun nativeCreateIntCallback(): dev.nanaloveyuki.ajni.AjniCallback
+  @JvmStatic private external fun nativeHandledObserverError(): Boolean
   @JvmStatic private external fun nativeWebViewEvent(kind: Int, handle: Long, payload: String, detail: String)
 }

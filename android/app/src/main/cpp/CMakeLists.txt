@@ -30,6 +30,7 @@ if(NOT EXISTS "${MOON_HOME}/lib/runtime/runtime.c")
 endif()
 set(AJNI_BRIDGE_SOURCE "${AJNI_ROOT}/src/android/ajni_bridge.c")
 set(AJNI_WEBVIEW_BRIDGE_SOURCE "${AJNI_ROOT}/src/webview/ajni_webview_bridge.c")
+set(AJNI_CORE_SOURCE "${AJNI_ROOT}/src/runtime/ajni_runtime.c")
 
 list(GET MOONBIT_RUNTIME_SOURCES 0 MOONBIT_RUNTIME_SOURCE)
 if(NOT EXISTS "${MOONBIT_RUNTIME_SOURCE}")
@@ -113,6 +114,7 @@ add_custom_target(generate_moonbit_android_runtime DEPENDS "${MOONBIT_HOST_SOURC
 
 set_source_files_properties("${MOONBIT_HOST_SOURCE}" PROPERTIES GENERATED TRUE)
 add_library(ajni SHARED
+  "${AJNI_CORE_SOURCE}"
   "${AJNI_BRIDGE_SOURCE}"
   "${AJNI_WEBVIEW_BRIDGE_SOURCE}"
   "${MOONBIT_HOST_SOURCE}"
@@ -123,5 +125,6 @@ target_compile_definitions(ajni PRIVATE AJNI_USE_MOONBIT_EXPORTS=1 AJNI_FEATURE_
 target_include_directories(ajni PRIVATE "${MOON_HOME}/include")
 set_source_files_properties("${AJNI_BRIDGE_SOURCE}" PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")
 set_source_files_properties("${AJNI_WEBVIEW_BRIDGE_SOURCE}" PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")
+set_source_files_properties("${AJNI_CORE_SOURCE}" PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")
 set_source_files_properties(${MOONBIT_RUNTIME_SOURCES} PROPERTIES COMPILE_OPTIONS "-include;${AJNI_ROOT}/src/android/android_compat.h")
 target_link_libraries(ajni android log)
