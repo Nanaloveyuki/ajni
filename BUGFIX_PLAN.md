@@ -2,13 +2,13 @@
 
 ## 范围
 
-mbt（MoonBit）1.0 正式发布前，ajni 以修复现有行为的 bug、纠正构建问题和补齐文档为主，不正式扩充功能。
+2026-10-16 起，项目在维护现有行为的同时启动通用双向 JNI 设计，按 [ADR 0001](docs/adr/0001-general-jni.md) 分步实现，不再以 MoonBit 1.0 作为通用运行层的前置条件。本文继续记录现有缺陷和历史证据，不把设计能力写成已发布功能。
 
-本计划保留 core、Android、可选 WebView 的现有分包和支持范围。通用 Java 调用/字段/构造器 API、公开对象引用体系、绑定生成器、数组/DirectBuffer API、native peer、桌面 JVM invocation、新 ABI 和更多 WebView 控件均不进入当前修复清单。1.0 发布后再评估，不视为自动承诺。
+保留 core、Android、可选 WebView 的分包；通用调用、对象引用、回调与桌面 invocation 的实施和验收归 ADR。绑定生成器、DirectBuffer/native peer、新 ABI 和更多 WebView 控件不进入当前闭环。WebView 是通用 JNI 的可选消费者。
 
-Android/WebView 动态测试暂缓；允许单独核对真实 Java JNI，结果必须明确 JVM/fixture 边界。不得把 host stub 的成功返回、静态检查、APK 构建或桌面 JVM 结果当成 ART/WebView 运行验证。
+Android/WebView 设备验证已获授权；2026-10-16 在 API37 x86_64 模拟器实际通过 8 项 instrumentation（含 callback、Activity 重建与 WebView），证据见 ADR。真实 JDK 双向 fixture 单独记录；不把 host stub、静态检查、APK 或桌面 JVM 结果代替其他 ART/API/ABI 场景。
 
-以下 17 项已在 `0.2.5` 实现。历史验收限于源码审查和静态编译；本轮追加的 checked-JVM 证据见下方，Android/WebView 动态验证仍暂缓。
+以下 17 项已在 `0.2.5` 实现。该版本历史验收限于源码审查和静态编译；本轮 checked-JVM 与 Android/WebView 动态证据另行记录，不回写历史结果。
 
 ## 0.2.5 修复状态
 
@@ -265,6 +265,8 @@ Gradle 使用项目要求的 8.10.2。安装 Gradle 不会提供 Android SDK pla
 - 用户授权后追加真实 Zulu JVM `java -Xcheck:jni`：36 项断言通过，无 checked-JNI warning/error。临时 TU `#include` 真实 core stub，链接真实 MoonBit runtime（不用 AJNI_STANDALONE_JNI）；采用未改 NDK JNI table declarations 驱动真实 JVM。临时 Java NativeBridge/Context/Surface 仅提供一致 descriptor，非生产 Kotlin/Android 实现；Android window 函数若被触达立即 abort，未调用 Surface/WebView。验证九个 core RegisterNatives、初始化失败/成功、worker 未初始化/关闭后 ThrowNew、原 pending exception 身份与缺异常类查找、empty/null/NUL/中文/emoji/BOM/孤立 surrogate、overlong/truncated/surrogate/out-of-range UTF-8、upcall jint/jlong/成功/拒绝/抛异常（含 throwable.toString 再抛）、借用 attachment 不 detach、自有 pthread attachment detach、真实 worker→Java callback、shutdown/reinit generation。fixture 与库在验证后删除；不是生产 Kotlin→JNI→MoonBit 链路、Android 调度、refcount 或 unload 动态证明。
 
 仍暂缓：ART lookup/registration/attach/refcount 动态失败、shutdown/迟到 Android work、真正 Kotlin→JNI→MoonBit 链路、WebView lifecycle/resources/renderer、R8-minified lookup。MoonBit 测试只 build-only；APK/lint/checker/observer/fresh C 与上述 JVM fixture 均不升级为这些场景通过。发布按用户授权独立执行，不新增平台/ABI/API 或重试框架。
+
+2026-10-16 通用运行层与 Android seam 迁移另见 [ADR 0001](docs/adr/0001-general-jni.md#设计依据与已知证据)。永久 `scripts/run-jvm-smoke.py` 已通过 Java/native 双宿主及失败支路；NDK 两 ABI/两配置、12 个 bridge native、APK/instrumentation 编译和 lint 通过。API37 x86_64 实际通过 8 项设备测试，覆盖 typed callback、foreign reject/close、捕获后不误抛、真正 Activity 重建、feature shutdown-reinit 与现有 WebView 消息/资源/容器路径；demo 启动并观测 native Surface。arm64 真机、API24 运行、R8 lookup、未覆盖失败注入仍未验证，不改写以上历史证据。
 
 ## 成熟项目对照：仅保留与修 bug 有关的模式
 

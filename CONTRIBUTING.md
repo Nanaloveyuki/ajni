@@ -2,26 +2,18 @@
 
 ## Scope
 
-`ajni` is an Android JNI runtime, not a window toolkit or application
-framework. Keep JNI ownership, Kotlin host behavior, and MoonBit public API
-explicit. The root `Nanaloveyuki/ajni` package must remain usable without
-linking the optional `Nanaloveyuki/ajni/webview` native stub.
+`ajni` is a JNI runtime whose core target is a checked, bidirectional Java↔MoonBit call path. Android host integration remains a first consumer; WebView is optional and must not shape the core interface. Keep JNI ownership, Kotlin host behavior, and MoonBit public API explicit.
 
-Discuss changes that alter JNI class names, Kotlin/native method signatures,
-public MoonBit APIs, Android API levels, or the feature split before starting
-implementation. Focused fixes, tests, and documentation improvements can be
-proposed directly.
+The root `Nanaloveyuki/ajni` package must remain usable without linking the optional `Nanaloveyuki/ajni/webview` native stub. General JNI runtime work follows [ADR 0001](docs/adr/0001-general-jni.md): the core owns session, handle, method/field, exception, and callback contracts; desktop JVM invocation and Android host adapters stay separate.
 
-Until MoonBit 1.0 is officially released, work is limited to bug fixes in
-existing behavior, build correctness, and documentation. Do not add general
-JNI APIs, binding generators, new platform/ABI support, or additional WebView
-features. Use [BUGFIX_PLAN.md](BUGFIX_PLAN.md) to track defect evidence and
-static acceptance criteria; reconsider feature expansion after 1.0.
+Discuss changes that alter JNI class names, Kotlin/native method signatures, public MoonBit APIs, Android API levels, or the feature split before starting implementation. Focused fixes, tests, and documentation improvements can be proposed directly.
+
+Before MoonBit 1.0, preserve the existing behavior while the general JNI seam is designed and implemented incrementally. Do not add binding generators, new platform/ABI support, or additional WebView features as part of this work. Use [BUGFIX_PLAN.md](BUGFIX_PLAN.md) for existing defect evidence; use the ADR and implementation records for the new runtime surface.
 
 ## Development Setup
 
-Install toolchain archive `0.10.14+7d59c7ec9` and Java 17. Its `moon` CLI version
-is `0.1.20260920`, recorded in `.moon-version`; archive IDs are compiler versions,
+Install toolchain archive `0.10.14+7d59c7ec9`, JDK 21 for JVM smoke and Java 17 for Android builds.
+Its `moon` CLI version is `0.1.20260920`, recorded in `.moon-version`; archive IDs are compiler versions,
 not CLI versions. For Linux/macOS, pass `0.10.14+7d59c7ec9` to the official
 installer. Android build work additionally needs Android SDK platform 35,
 platform tools, NDK `29.0.14206865`, CMake `4.1.2`, and the bundled Gradle
@@ -38,8 +30,9 @@ output, or generated APKs.
 
 ## Package Boundaries
 
-- `src/` is the core JNI runtime. Do not add browser commands or browser event
-  types here.
+- `src/` is the descriptor/text package; `src/runtime/` owns generic JNI resources
+  and calls. `src/unsafe/` exposes raw host integration; `src/invocation/` alone
+  imports dynlib. Do not add browser commands or event types to these packages.
 - `src/webview/` owns the optional WebView MoonBit API and
   `ajni_webview_bridge.c` native stub.
 - `android/host/` contains the stable Kotlin JNI host class
@@ -52,8 +45,7 @@ the core-only build path.
 
 ## Validate Changes
 
-The current validation scope is static checking; Android/WebView runtime tests
-are deferred. Run:
+Run native static checks and build-only existing unit tests:
 
 ```powershell
 moon fmt --check
@@ -90,12 +82,14 @@ R8-minified lookup. Checker smoke may mutate temporary copies/captured javap,
 never production source. Package checks use `moon package --list --frozen` after
 dependency installation, consume both output streams, and fail on missing inputs.
 
-Android/WebView device/emulator/runtime scenarios remain deferred. Real Java JNI
-checks may run separately when authorized, with JVM version, actual C paths and
-fixture limitations recorded; they do not validate production Kotlin or ART.
-Compile MoonBit and instrumentation tests without executing them. Non-Android
-operations report unsupported failures, not simulated ART/WebView success.
-GitHub Actions compiles both ABIs/test sources and runs static lint without devices.
+Run `moon update` then `python3 scripts/run-jvm-smoke.py` on Linux with JDK21
+and a C compiler. Its isolated workspace exercises Java/native hosting against
+the real checked JVM, including typed calls, callbacks, lifetime and failures.
+This is distinct from Kotlin/ART evidence. CI executes this fixture, while
+Android CI compiles both ABIs/instrumentation and runs static lint without devices.
+When a device/emulator is available, run instrumentation and record its API/ABI
+and actual results separately. A build or Kotlin-only observer is not JNI proof.
+Non-Android feature operations report unsupported, never simulated platform success.
 
 Keep observer mutation/main-thread contracts and snapshot reentrancy intact;
 subscriptions survive ordinary shutdown. Instrumentation cleanup must clear the

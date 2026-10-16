@@ -4,16 +4,19 @@ import argparse
 from pathlib import Path
 import re
 import sys
-import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = re.compile(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)')
 
 
 def release_notes(root, tag):
-    module = tomllib.loads((root / 'moon.mod').read_text(encoding='utf-8'))
-    version = module['version']
-    if not isinstance(version, str) or not VERSION.fullmatch(version):
+    manifest = (root / 'moon.mod').read_text(encoding='utf-8')
+    declarations = re.findall(r'^[ \t]*version[ \t]*=.*$', manifest, flags=re.MULTILINE)
+    if len(declarations) != 1:
+        raise ValueError('moon.mod must contain exactly one version assignment')
+    literal = re.fullmatch(r'[ \t]*version[ \t]*=[ \t]*"([^"\r\n]*)"[ \t]*(?://[^\r\n]*)?', declarations[0])
+    version = literal.group(1) if literal else ''
+    if not VERSION.fullmatch(version):
         raise ValueError('moon.mod version must be a stable X.Y.Z version')
     if tag != f'v{version}':
         raise ValueError(f'release tag {tag!r} does not match moon.mod v{version}')

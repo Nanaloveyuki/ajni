@@ -1,15 +1,23 @@
 # ajni
 
-`ajni` provides MoonBit-facing JVM JNI primitives and an Android runtime
-bridge. The root package builds checked JVM class, type, method, and
-native-method declarations; the Android package supplies a stable Kotlin host,
-lifecycle and UI-thread callbacks, safe Java UTF-16/MoonBit UTF-8 conversion,
-and an optional Android `WebView` feature.
+`ajni` provides checked bidirectional Java↔MoonBit JNI calls and an Android
+host adapter. The root package validates JVM declarations without JNI headers;
+`runtime` owns sessions, global-reference handles, typed calls and callbacks.
+Android supplies lifecycle, Surface and main-Looper integration. WebView is an
+optional consumer, not a dependency of the generic runtime.
 
-The generic, Android, and WebView packages are separate. Applications that
-only need JVM JNI declarations import `Nanaloveyuki/ajni`; Android hosts add
-`Nanaloveyuki/ajni/android`; applications that embed a browser additionally
-import `Nanaloveyuki/ajni/webview` and link its native stub.
+| Package | Purpose |
+| --- | --- |
+| `Nanaloveyuki/ajni` | Checked class, type, method and native-method declarations |
+| `Nanaloveyuki/ajni/runtime` | Sessions, objects, calls, fields, arrays, exceptions and callbacks |
+| `Nanaloveyuki/ajni/unsafe` | Explicit raw JNI host/ref/function-pointer operations |
+| `Nanaloveyuki/ajni/invocation` | Optional desktop JVM creation using `dynlib` |
+| `Nanaloveyuki/ajni/android` | Android host adapter |
+| `Nanaloveyuki/ajni/webview` | Optional Android WebView integration |
+
+See [ADR 0001](docs/adr/0001-general-jni.md) for ownership, threading and
+acceptance contracts. The general runtime APIs are available starting with ajni 0.3.0.
+The pinned toolchain currently requires `0.x.y` package versions.
 
 ## Install
 
@@ -52,6 +60,61 @@ MoonBit values.
 so existing non-raising object/descriptor constructors remain valid. Native
 method names may use all 65,535 bytes. These are encoding-byte limits, not
 UTF-16 lengths or ordinary UTF-8 lengths.
+
+## Bidirectional Runtime
+
+The host initializes the matching MoonBit runtime and package globals on one OS
+thread, then calls `ajni_rt_host_open(env, application_loader)` from
+[`ajni_runtime.h`](src/runtime/ajni_runtime.h). Every Java-to-MoonBit entry must
+call `ajni_rt_host_enter` **before** touching managed values, and balance it with
+`ajni_rt_host_leave`. `JNI_OnLoad` registers natives but does not choose the owner.
+The runnable host example is [`tests/jvm/bridge.c`](tests/jvm/bridge.c).
+
+```moonbit nocheck
+let session = @runtime.Session::current()
+let builder = session.find_class(@ajni.JniClass::parse("java/lang/StringBuilder"))
+let instance = builder.lookup_constructor([]).new([])
+let append = builder.instance_method("append", @ajni.JniMethod::new(
+  [@ajni.JniType::object(@ajni.JniClass::parse("java/lang/String"))],
+  return_type=@ajni.JniType::object(@ajni.JniClass::parse("java/lang/StringBuilder")),
+))
+ignore(append.call([@runtime.Object(Some(session.new_string("MoonBit")))], receiver=instance))
+let callback = session.callback(
+  @ajni.JniMethod::new([@ajni.JniType::int()], return_type=@ajni.JniType::int()),
+  (args) => match args[0] {
+    Int(value) => @runtime.Int(value + 1)
+    _ => raise @runtime.InvalidArgument("Expected int")
+  },
+)
+// Pass callback.object() to Java; AjniCallback.invoke(41) returns Integer(42).
+```
+
+Compile the Java companion under `java/src/main/java` with the host application.
+Its fixed dispatcher boxes primitive results and checks argument wrappers against
+the registered descriptor. Arbitrary Java interfaces require a Java/Kotlin adapter.
+Same-owner synchronous reentry is supported; foreign-thread invocation is rejected
+before MoonBit entry. Java may close a callback from any thread; owner entry drains
+the deferred closure release. Close callbacks when no longer needed.
+
+Public objects retain global references. Aliases share close state; session close
+invalidates all descendants and is rejected with `Busy` during active calls.
+`JavaThrown(object)` retains the original Throwable and can be caught or returned
+through a callback without replacing its identity. Strings preserve UTF-16 code
+units, including NUL and unpaired surrogates. Arrays copy regions, never pin Java
+memory across a callback. See the [runtime API guide](src/runtime/README.mbt.md).
+
+For a native executable, `@invocation.create(full_library_path, options)` loads
+`JNI_CreateJavaVM` through `Nanaloveyuki/dynlib` without prelinking `libjvm`.
+Pass the companion/application classpath explicitly. Creation is attempted once;
+after that attempt its library stays loaded until process exit. `Session.close`
+does not call `DestroyJavaVM`. Loader/creation failures use `InvocationError`;
+host initialization failures use `RuntimeError`. See
+[`tests/invocation`](tests/invocation) for a complete executable consumer.
+
+JNI headers must be supplied when compiling native stubs: JDK headers for desktop,
+NDK headers for Android. Without headers, operations report `UnsupportedTarget`.
+Only Linux/JDK and configured Android ABIs have execution/build evidence here;
+Windows/macOS desktop ABI support is not claimed.
 
 ## Android Runtime
 
@@ -191,10 +254,12 @@ not a network sandbox for page subresources, redirects, or links.
 
 ## Maintenance Scope
 
-Until MoonBit 1.0 is officially released, ajni focuses on fixes to existing
-behavior, build correctness, and documentation. Feature expansion is deferred.
-See [BUGFIX_PLAN.md](BUGFIX_PLAN.md) for categorized defects, implementation
-status, evidence, and remaining validation limits.
+Existing behavior continues to receive bug fixes, build corrections, and
+documentation updates. General bidirectional JNI runtime work now follows
+[ADR 0001](docs/adr/0001-general-jni.md); WebView remains an optional consumer
+and does not expand as part of the core closure.
+See [BUGFIX_PLAN.md](BUGFIX_PLAN.md) for existing defect evidence, status, and
+remaining validation limits.
 
 ## Build And Verify
 
@@ -208,18 +273,22 @@ moon info --target native
 python3 scripts/check-package-files.py
 ```
 
-Android/WebView runtime testing is currently deferred. Static checks and APK
-compilation do not prove ART, lifecycle, Surface, or WebView behavior. Android
-compilation additionally requires the SDK, NDK `29.0.14206865`, CMake, Java 17,
-and the pinned Gradle `8.10.2` wrapper under `android/`.
+Real JVM smoke on Linux requires JDK 21, a C compiler and the pinned MoonBit
+toolchain. It builds an isolated workspace, executes Java with `-Xcheck:jni`,
+then executes a native-hosted JVM without prelinking `libjvm`:
 
-CI verifies the pinned MoonBit version, checks the real frozen publication list,
-compiles tests without executing them, and invokes `:host:checkJniContract` before
-static lint/APK compilation. The JNI gate pairs actual `javap -private -s` method
-blocks with literal C registrations, real native definitions and precise keep
-members, then uses real NDK API24 compilers for both ABIs/export configurations.
-Its C varargs association/count checks do not prove expression types; manual ABI
-review and R8-minified runtime lookup remain separate requirements.
+```sh
+moon update
+python3 scripts/run-jvm-smoke.py
+```
+
+Both host modes passed locally, including negative loader/creation cases. CI runs
+this command alongside native check/build-only unit tests and publication checks.
+Android compilation requires SDK35, NDK `29.0.14206865`, CMake `4.1.2`, Java 17
+and the pinned Gradle `8.10.2` wrapper. The JNI gate pairs actual bytecode with
+C registrations/definitions and precise bridge/companion keep rules, then uses
+real NDK API24 compilers for both ABIs/export configurations. Its varargs checks
+prove association/count, not expression types or R8-minified runtime lookup.
 
 Standalone JNI gate (requires actual compiled Kotlin classes):
 
@@ -231,13 +300,16 @@ python3 scripts/check-jni-contract.py --class-dir android/host/build/tmp/kotlin-
 `.moonignore` independently excludes research `tmp/` and observed Python/build
 caches; `.gitignore` is not the publication policy. The gate requires key public,
 native, Android-wrapper and checker inputs, and rejects incomplete/diagnostic-only
-lists. Local maintenance passed both gates and their negative smoke, native
-build-only tests, both-ABI debug APK compilation and host/app lint. A real checked
-JVM fixture passed 36 JNI assertions, separately from deferred Android/WebView
-runtime validation; see [recorded evidence and deferred scenarios](BUGFIX_PLAN.md#026-维护验收).
+lists. Local validation passed native check/build-only tests, checked-JVM fixtures,
+both-ABI debug APK/instrumentation compilation, the JNI contract and host/app lint.
+API37 x86_64 emulator execution passed all 8 instrumentation tests: captured
+callbacks, foreign rejection/close, handled observer errors, Activity recreation,
+feature shutdown/reinit, Unicode and WebView message/resource/container paths.
+The demo also launched and rendered its native Surface. arm64 device execution,
+API24 runtime and R8-minified lookup remain unverified. See
+[ADR evidence](docs/adr/0001-general-jni.md#设计依据与已知证据).
 
-The following emulator test command is retained for when runtime testing resumes;
-it is not part of the current validation requirement:
+With a connected emulator, execute the Android behavior tests separately:
 
 ```powershell
 $env:ANDROID_SDK_ROOT = "C:\path\to\Android\Sdk"

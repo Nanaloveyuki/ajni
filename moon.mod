@@ -1,6 +1,6 @@
 name = "Nanaloveyuki/ajni"
 
-version = "0.2.6"
+version = "0.3.0"
 
 description = "Checked bidirectional Java/MoonBit JNI runtime and Android host bridge."
 

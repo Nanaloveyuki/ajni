@@ -18,9 +18,15 @@ REQUIRED = {
     'android/host/consumer-rules.pro', 'scripts/check-package-files.py',
     'scripts/check-jni-contract.py', 'android/gradle/wrapper/gradle-wrapper.jar',
     'android/gradle/wrapper/gradle-wrapper.properties', 'scripts/build-android.ps1',
+    'src/runtime/moon.pkg', 'src/runtime/ajni_runtime.c', 'src/runtime/ajni_runtime.h',
+    'src/unsafe/moon.pkg', 'src/invocation/moon.pkg',
+    'java/src/main/java/dev/nanaloveyuki/ajni/AjniCallback.java',
+    'java/src/main/java/dev/nanaloveyuki/ajni/AjniException.java',
+    'scripts/run-jvm-smoke.py', 'tests/jvm/moon.mod', 'tests/jvm/main.mbt',
+    'tests/invocation/moon.mod', 'tests/invocation/main.mbt',
 }
 FORBIDDEN_PARTS = {
-    '.git', '.hg', '.svn', '.gradle', '.kotlin', '.cxx', '.cmake',
+    '.git', '.hg', '.svn', '.gradle', '.kotlin', '.cxx', '.cmake', '.mooncakes',
     '.idea', '.vscode', '.settings', '.cache', 'CMakeFiles', '__pycache__', '.externalNativeBuild',
 }
 
