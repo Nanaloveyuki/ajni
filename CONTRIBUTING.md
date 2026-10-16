@@ -169,9 +169,12 @@ same validated source ZIP to Mooncakes after GitHub Release creation:
    Actions variable `MOONCAKES_PUBLISH` to `true` to enable the job. The JSON shape
    is `{"token":"...","username":"..."}`; `username` is optional.
 3. The release job writes credentials with mode `0600` only for publishing,
-   extracts the validated source artifact, runs `moon publish --frozen`, and
-   removes credentials on exit and in an always-running cleanup step. It does
-   not expose the secret to pull requests or cache/upload MoonBit home.
+   extracts the validated source artifact, resolves dependencies with `moon check`,
+   validates its publication file list, then runs `moon publish`. The pinned
+   publisher rechecks a fresh extraction, so `--frozen` cannot install its dependencies.
+   `.moonignore` must ship with the archive to preserve `.moon-version` on repack.
+   Credentials are removed on exit and in an always-running cleanup step; no
+   secret is exposed to pull requests or cached/uploaded with MoonBit home.
 
 Configure without printing the credential (replace the path when `MOON_HOME`
 differs from the default):

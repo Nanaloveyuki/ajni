@@ -18,3 +18,4 @@ tests/**/__pycache__/
 
 # Published Android build scripts read this pin too.
 !/.moon-version
+!/.moonignore

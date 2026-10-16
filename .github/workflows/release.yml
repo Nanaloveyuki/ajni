@@ -130,7 +130,9 @@ jobs:
           source_dir="$(mktemp -d "$RUNNER_TEMP/ajni-publish.XXXXXX")"
           unzip -q "$RUNNER_TEMP"/ajni-package/*.zip -d "$source_dir"
           cd "$source_dir"
-          moon publish --frozen
+          moon check --target native
+          python3 scripts/check-package-files.py
+          moon publish
       - name: Remove registry credentials
         if: always()
         run: rm -f "$MOON_HOME/credentials.json"

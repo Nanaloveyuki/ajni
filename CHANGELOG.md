@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Preserve `.moonignore` in source archives so registry repackaging retains the `.moon-version` required by Android build scripts; enforce both files in publication checks.
+- Resolve dependencies when publishing extracted release archives. The pinned publisher validates another fresh extraction, where `--frozen` prevents installing the required `dynlib` dependency.
+- No runtime API or behavior changes from 0.3.0.
+
 ## 0.3.0
 
 - Major feature release: ajni now supplies a general bidirectional JNI runtime, not only declarations and an Android event bridge. Hosts must initialize the matching MoonBit runtime and establish the owner-thread session explicitly; arbitrary foreign-thread MoonBit entry is unsupported. The pinned toolchain requires `0.x.y` package versions, so this release is `0.3.0`, not `1.0.0`; no additional platform/ABI support is implied.
