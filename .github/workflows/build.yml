@@ -33,7 +33,7 @@ jobs:
       - name: Setup pinned MoonBit
         uses: ./.github/actions/setup-moonbit
       - name: Setup JDK for checked JNI smoke
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -84,7 +84,7 @@ jobs:
       - name: Resolve optional invocation dependency
         run: moon update
       - name: Setup JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
