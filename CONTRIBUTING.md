@@ -97,6 +97,12 @@ observer, shut down, and reverse-detach tracked containers even after failures.
 The Kotlin observer fires before JNI and is not end-to-end MoonBit evidence.
 Current exercised checks and deferred scenarios are recorded in `BUGFIX_PLAN.md`.
 
+For the isolated Harmony NAPI fixture, run `python3 scripts/build-ohos-mvp.py --host-smoke`
+with the installed DevEco SDK, then `python3 scripts/run-ohos-mvp.py --hap <hap>`
+against one connected HDC target. Generated C and matching MoonBit runtime sources
+are staged outside the repository. Keep SDK family/API/ABI build evidence separate
+from emulator/device results; see [ADR 0002](docs/adr/0002-harmony-validation.md).
+
 Update `README.md`, package `README.mbt.md` files, generated public interfaces,
 and tests whenever observable behavior changes. Do not commit `_build`,
 `.mooncakes`, Android SDK/NDK files, Gradle caches, or IDE output.

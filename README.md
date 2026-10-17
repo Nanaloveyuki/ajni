@@ -19,6 +19,12 @@ See [ADR 0001](docs/adr/0001-general-jni.md) for ownership, threading and
 acceptance contracts. The general runtime APIs are available starting with ajni 0.3.0.
 The pinned toolchain currently requires `0.x.y` package versions.
 
+HarmonyOS/OpenHarmony exploration stays in the unpublished `tests/ohos/` NAPI
+fixture, separate from JNI. The API26 x86_64 DevEco emulator passed the native
+suite and Worker-termination cleanup; arm64 is build-only, and independent
+OpenHarmony runtime support is unverified. See [ADR 0002](docs/adr/0002-harmony-validation.md)
+for reproduction commands and limits.
+
 ## Install
 
 ```powershell

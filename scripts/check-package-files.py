@@ -36,6 +36,8 @@ def forbidden(path):
     return (parts[0] in {'tmp', 'ref', '_build', '.moon', '.mooncakes'}
             or bool(FORBIDDEN_PARTS.intersection(parts))
             or path.as_posix() == 'android/local.properties'
+            or path.as_posix().startswith('tests/ohos/')
+            or path.as_posix() in {'scripts/build-ohos-mvp.py', 'scripts/run-ohos-mvp.py'}
             or (parts[0] == 'android' and 'build' in parts)
             or path.suffix == '.iml'
             or path.name in {'CMakeCache.txt', 'CMakeFiles'})

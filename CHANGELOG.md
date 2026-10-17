@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add an isolated, unpublished Harmony NAPI validation fixture with MoonBit C embedding, a Stage host, bounded owner-thread callbacks, and repeatable DevEco/HDC runners. API26 x86_64 emulator validation covers 13 runtime scenarios and Worker-owner termination cleanup; arm64 is build-only, independent OpenHarmony runtime and ArkWeb remain unverified. Published JNI APIs are unchanged.
+
 ## 0.3.1
 
 - Preserve `.moonignore` in source archives so registry repackaging retains the `.moon-version` required by Android build scripts; enforce both files in publication checks.

@@ -1,0 +1,7 @@
+{
+  "modelVersion": "6.26.8",
+  "name": "ajni-ohos-mvp",
+  "version": "0.0.0",
+  "description": "Private AJNI Harmony runtime validation fixture",
+  "dependencies": {}
+}

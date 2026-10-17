@@ -1,0 +1,14 @@
+{
+  "name": "ajni-ohos-mvp",
+  "version": "1.0.0",
+  "description": "AJNI HarmonyOS API 26 native validation host",
+  "ohos": {
+    "org": "huawei",
+    "buildTool": "hvigor",
+    "directoryLevel": "project"
+  },
+  "dependencies": {
+    "@ohos/hvigor": "6.26.8",
+    "@ohos/hvigor-ohos-plugin": "6.26.8"
+  }
+}
