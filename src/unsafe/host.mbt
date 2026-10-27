@@ -5,7 +5,7 @@
 /// native host glue must call ajni_rt_host_* before entering MoonBit at all.
 pub fn host_open(
   env : UInt64,
-  class_loader? : UInt64 = 0,
+  class_loader~ : UInt64 = 0,
 ) -> @runtime.Session raise @runtime.RuntimeError {
   @runtime.internal_check_status(native_host_open(env, class_loader))
   @runtime.Session::current()

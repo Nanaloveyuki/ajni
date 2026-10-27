@@ -33,7 +33,8 @@ def jdk_home():
 
 def copy_module(destination):
     destination.mkdir()
-    shutil.copy2(ROOT / 'moon.mod', destination / 'moon.mod')
+    for name in ('moon.mod', '.moon-version', '.moonbit-toolchain'):
+        shutil.copy2(ROOT / name, destination / name)
     shutil.copytree(ROOT / 'src', destination / 'src')
     shutil.copytree(ROOT / 'tests', destination / 'tests',
                     ignore=shutil.ignore_patterns('.mooncakes', '_build', '__pycache__'))

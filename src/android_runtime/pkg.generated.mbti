@@ -4,11 +4,11 @@ package "Nanaloveyuki/ajni/android_runtime"
 // Values
 pub fn create_int_callback(UInt64) -> UInt64
 
-pub fn dispatch(Int, Int, Int) -> Unit
+pub fn dispatch(Int32, Int32, Int32) -> Unit
 
-pub fn dispatch_webview(Int, Int64, Bytes, Bytes) -> Unit
+pub fn dispatch_webview(Int32, Int64, Bytes, Bytes) -> Unit
 
-pub fn handled_observer_error() -> Int
+pub fn handled_observer_error() -> Int32
 
 // Errors
 

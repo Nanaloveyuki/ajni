@@ -22,6 +22,7 @@ tests/ohos/
 scripts/build-ohos-mvp.py
 scripts/run-ohos-mvp.py
 
-# Published Android build scripts read this pin too.
+# Preserve both toolchain pins alongside the published Android build scripts.
 !/.moon-version
+!/.moonbit-toolchain
 !/.moonignore

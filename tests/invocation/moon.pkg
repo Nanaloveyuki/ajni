@@ -2,7 +2,7 @@ import {
   "Nanaloveyuki/ajni" @jni,
   "Nanaloveyuki/ajni/runtime" @rt,
   "Nanaloveyuki/ajni/unsafe" @raw,
-  "Nanaloveyuki/ajni/invocation" @invocation,
+  "Nanaloveyuki/ajni/invocation",
   "moonbitlang/core/env",
 }
 

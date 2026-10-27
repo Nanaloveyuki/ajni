@@ -1,16 +1,16 @@
 ///|
-let handlers : Map[Int, (AndroidEvent) -> Unit] = Map([])
+let handlers : Map[Int32, (AndroidEvent) -> Unit] = Map([])
 
 ///|
-let callback_installation : Map[Int, Unit] = Map([])
+let callback_installation : Map[Int32, Unit] = Map([])
 
 ///|
-let next_handler_id : Ref[Int] = Ref(1)
+let next_handler_id : Ref[Int32] = Ref(1)
 
 ///|
 fn ensure_callback_installed() -> Unit {
   if !callback_installation.contains(0) {
-    let callback = fn(kind : Int, first : Int, second : Int) {
+    let callback = fn(kind : Int32, first : Int32, second : Int32) {
       dispatch_native_event(kind, first, second)
     }
     native_install_event_callback(
@@ -24,7 +24,7 @@ fn ensure_callback_installed() -> Unit {
 ///|
 /// Registers a process-wide, non-thread-safe observer. Use the runtime owner
 /// thread; subscriptions survive Android feature shutdown/reinitialization.
-pub fn install_event_handler(handler : (AndroidEvent) -> Unit) -> Int {
+pub fn install_event_handler(handler : (AndroidEvent) -> Unit) -> Int32 {
   ensure_callback_installed()
   let id = next_handler_id.val
   next_handler_id.val = id + 1
@@ -34,7 +34,7 @@ pub fn install_event_handler(handler : (AndroidEvent) -> Unit) -> Int {
 
 ///|
 /// Removes the token from future snapshots, not an already captured snapshot.
-pub fn remove_event_handler(id : Int) -> Unit {
+pub fn remove_event_handler(id : Int32) -> Unit {
   ignore(handlers.remove(id))
 }
 
@@ -54,7 +54,7 @@ pub fn start_worker() -> Unit raise @ajni.JniError {
 }
 
 ///|
-fn check_native_status(status : Int) -> Unit raise @ajni.JniError {
+fn check_native_status(status : Int32) -> Unit raise @ajni.JniError {
   match status {
     1 => ()
     0 => raise NotInitialized
@@ -71,19 +71,23 @@ pub fn runtime_ready() -> Bool {
 
 ///|
 /// Synchronously emits on the calling owner thread.
-pub fn emit_for_test(kind : Int, first : Int, second : Int) -> Unit {
+pub fn emit_for_test(kind : Int32, first : Int32, second : Int32) -> Unit {
   native_emit_for_test(kind, first, second)
 }
 
 ///|
 /// Synchronous export linked as `ajni_dispatch_event`; callers must be on the
 /// runtime owner. Snapshots have no order guarantee; nested dispatch is fresh.
-pub fn dispatch_from_android(kind : Int, first : Int, second : Int) -> Unit {
+pub fn dispatch_from_android(
+  kind : Int32,
+  first : Int32,
+  second : Int32,
+) -> Unit {
   dispatch_native_event(kind, first, second)
 }
 
 ///|
-fn dispatch_native_event(kind : Int, first : Int, second : Int) -> Unit {
+fn dispatch_native_event(kind : Int32, first : Int32, second : Int32) -> Unit {
   let event = match kind {
     1 => Lifecycle(Created)
     2 => Lifecycle(Started)

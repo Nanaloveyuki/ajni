@@ -1,7 +1,7 @@
 ///|
 // Classfile CONSTANT_Utf8 lengths count UTF-16 code units in Modified UTF-8,
 // not Unicode scalar values or ordinary UTF-8. Stop before the bound can grow.
-fn mutf8_length_bounded(text : String, limit : Int) -> Int raise JniError {
+fn mutf8_length_bounded(text : String, limit : Int32) -> Int32 raise JniError {
   if text.length() > limit {
     raise DescriptorTooLong
   }
@@ -28,7 +28,7 @@ fn mutf8_length_bounded(text : String, limit : Int) -> Int raise JniError {
 /// An internal JVM binary class name, for example `java/lang/String`.
 pub struct JniClass {
   priv internal_name : String
-  priv internal_name_bytes : Int
+  priv internal_name_bytes : Int32
 } derive(Eq, Debug)
 
 ///|
@@ -76,9 +76,9 @@ pub fn JniClass::descriptor(self : JniClass) -> String {
 /// descriptors cannot undercount `long` and `double`.
 pub struct JniType {
   priv descriptor : String
-  priv descriptor_bytes : Int
-  priv parameter_slots : Int
-  priv array_dimensions : Int
+  priv descriptor_bytes : Int32
+  priv parameter_slots : Int32
+  priv array_dimensions : Int32
 } derive(Eq, Debug)
 
 ///|

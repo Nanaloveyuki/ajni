@@ -1,13 +1,13 @@
 ///|
 /// Stable Android C entry point. The JNI bridge links this package in a
 /// production Android build and calls the exported `ajni_dispatch_event`.
-pub fn dispatch(kind : Int, first : Int, second : Int) -> Unit {
+pub fn dispatch(kind : Int32, first : Int32, second : Int32) -> Unit {
   @android.dispatch_from_android(kind, first, second)
 }
 
 ///|
 pub fn dispatch_webview(
-  kind : Int,
+  kind : Int32,
   handle : Int64,
   payload : Bytes,
   detail : Bytes,
@@ -57,7 +57,7 @@ pub fn create_int_callback(env : UInt64) -> UInt64 {
 }
 
 ///|
-pub fn handled_observer_error() -> Int {
+pub fn handled_observer_error() -> Int32 {
   let handled = Ref(false)
   let token = @android.install_event_handler(_event => {
     ignore(

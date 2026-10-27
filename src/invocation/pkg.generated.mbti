@@ -16,7 +16,7 @@ pub(all) suberror InvocationError {
   LoadFailed(@dynlib.DynlibError)
   ResolveFailed(@dynlib.DynlibError)
   AlreadyAttempted
-  CreateFailed(Int)
+  CreateFailed(Int32)
   OutOfMemory
 }
 

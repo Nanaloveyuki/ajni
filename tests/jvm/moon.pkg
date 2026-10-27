@@ -6,10 +6,6 @@ import {
 pkgtype(kind: "executable")
 
 options(
-  "native-stub": ["bridge.c"],
-  link: {
-    "native": {
-      "exports": ["smoke_run:ajni_smoke_run"],
-    },
-  },
+  "native-stub": [ "bridge.c" ],
+  link: { "native": { "exports": [ "smoke_run:ajni_smoke_run" ] } },
 )

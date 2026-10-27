@@ -54,6 +54,7 @@ file(GLOB AJNI_MODULE_INPUTS CONFIGURE_DEPENDS
   "${AJNI_ROOT}/moon.lock"
   "${AJNI_ROOT}/moon.lock.json"
   "${AJNI_ROOT}/.moon-version"
+  "${AJNI_ROOT}/.moonbit-toolchain"
 )
 file(GLOB_RECURSE AJNI_DEPENDENCY_INPUTS CONFIGURE_DEPENDS
   "${AJNI_ROOT}/.mooncakes/*.mbt"

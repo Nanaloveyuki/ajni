@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub fn internal_check_status(Int) -> Unit raise RuntimeError
+pub fn internal_check_status(Int32) -> Unit raise RuntimeError
 
 pub fn unsafe_export_local(JavaObject, UInt64) -> UInt64 raise RuntimeError
 
@@ -45,7 +45,7 @@ pub struct JavaClass {
 pub fn JavaClass::instance_field(Self, String, @ajni.JniType) -> JavaField raise RuntimeError
 pub fn JavaClass::instance_method(Self, String, @ajni.JniMethod) -> JavaMethod raise RuntimeError
 pub fn JavaClass::lookup_constructor(Self, ArrayView[@ajni.JniType]) -> JavaConstructor raise RuntimeError
-pub fn JavaClass::new_object_array(Self, Int, initial? : JavaObject) -> JavaObject raise RuntimeError
+pub fn JavaClass::new_object_array(Self, Int32, initial? : JavaObject) -> JavaObject raise RuntimeError
 pub fn JavaClass::object(Self) -> JavaObject
 pub fn JavaClass::static_field(Self, String, @ajni.JniType) -> JavaField raise RuntimeError
 pub fn JavaClass::static_method(Self, String, @ajni.JniMethod) -> JavaMethod raise RuntimeError
@@ -69,22 +69,22 @@ pub fn JavaMethod::call(Self, ArrayView[JavaValue], receiver? : JavaObject) -> J
 pub struct JavaObject {
   native : NativeObject
 }
-pub fn JavaObject::array_length(Self) -> Int raise RuntimeError
+pub fn JavaObject::array_length(Self) -> Int32 raise RuntimeError
 pub fn JavaObject::close(Self) -> Unit raise RuntimeError
-pub fn JavaObject::get_element(Self, Int) -> JavaValue raise RuntimeError
+pub fn JavaObject::get_element(Self, Int32) -> JavaValue raise RuntimeError
 pub fn JavaObject::is_same(Self, Self) -> Bool raise RuntimeError
-pub fn JavaObject::read_region(Self, Int, Int) -> Array[JavaValue] raise RuntimeError
-pub fn JavaObject::set_element(Self, Int, JavaValue) -> Unit raise RuntimeError
+pub fn JavaObject::read_region(Self, Int32, Int32) -> Array[JavaValue] raise RuntimeError
+pub fn JavaObject::set_element(Self, Int32, JavaValue) -> Unit raise RuntimeError
 pub fn JavaObject::to_string_value(Self) -> String raise RuntimeError
-pub fn JavaObject::write_region(Self, Int, ArrayView[JavaValue]) -> Unit raise RuntimeError
+pub fn JavaObject::write_region(Self, Int32, ArrayView[JavaValue]) -> Unit raise RuntimeError
 
 pub(all) enum JavaValue {
   Void
   Boolean(Bool)
-  Byte(Int)
-  Char(Int)
-  Short(Int)
-  Int(Int)
+  Byte(Int32)
+  Char(Int32)
+  Short(Int32)
+  Int(Int32)
   Long(Int64)
   Float(Float)
   Double(Double)
@@ -104,7 +104,7 @@ pub fn Session::callback(Self, @ajni.JniMethod, (ArrayView[JavaValue]) -> JavaVa
 pub fn Session::close(Self) -> Unit raise RuntimeError
 pub fn Session::current() -> Self raise RuntimeError
 pub fn Session::find_class(Self, @ajni.JniClass) -> JavaClass raise RuntimeError
-pub fn Session::new_primitive_array(Self, @ajni.JniType, Int) -> JavaObject raise RuntimeError
+pub fn Session::new_primitive_array(Self, @ajni.JniType, Int32) -> JavaObject raise RuntimeError
 pub fn Session::new_string(Self, String) -> JavaObject raise RuntimeError
 
 // Type aliases

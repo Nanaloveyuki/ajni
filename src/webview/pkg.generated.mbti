@@ -13,11 +13,11 @@ pub fn create(Int64, String, InitialContent, document_start_scripts? : Array[Str
 
 pub fn destroy(Int64, operation_id? : String) -> Unit raise @ajni.JniError
 
-pub fn dispatch_from_android(Int, Int64, Bytes, Bytes) -> Unit
+pub fn dispatch_from_android(Int32, Int64, Bytes, Bytes) -> Unit
 
 pub fn eval(Int64, String, String) -> Unit raise @ajni.JniError
 
-pub fn install_event_handler((Event) -> Unit) -> Int
+pub fn install_event_handler((Event) -> Unit) -> Int32
 
 pub fn load_html_with_base_url(Int64, String, String, operation_id? : String) -> Unit raise @ajni.JniError
 
@@ -25,11 +25,11 @@ pub fn navigate(Int64, String, operation_id? : String) -> Unit raise @ajni.JniEr
 
 pub fn post_message(Int64, String, operation_id? : String) -> Unit raise @ajni.JniError
 
-pub fn remove_event_handler(Int) -> Unit
+pub fn remove_event_handler(Int32) -> Unit
 
 pub fn respond_asset(Int64, String, AssetResponse, operation_id? : String) -> Unit raise @ajni.JniError
 
-pub fn set_bounds(Int64, Int, Int, Int, Int) -> Unit raise @ajni.JniError
+pub fn set_bounds(Int64, Int32, Int32, Int32, Int32) -> Unit raise @ajni.JniError
 
 // Errors
 
@@ -46,13 +46,13 @@ pub struct AssetRequest {
 } derive(Eq, @debug.Debug)
 
 pub struct AssetResponse {
-  status : Int
+  status : Int32
   mime_type : String
   encoding : String
   headers : Array[AssetHeader]
   body : Bytes
 } derive(Eq, @debug.Debug)
-pub fn AssetResponse::new(status~ : Int, mime_type~ : String, encoding? : String, headers? : Array[AssetHeader], body? : Bytes) -> Self
+pub fn AssetResponse::new(status~ : Int32, mime_type~ : String, encoding? : String, headers? : Array[AssetHeader], body? : Bytes) -> Self
 
 pub struct Event {
   handle : Int64
@@ -79,12 +79,12 @@ pub(all) enum InitialContent {
 } derive(Eq, @debug.Debug)
 
 pub struct WebViewResourceLimits {
-  max_page_message_bytes : Int
-  max_pending_asset_requests : Int
-  max_asset_response_bytes : Int
-  asset_response_timeout_millis : Int
+  max_page_message_bytes : Int32
+  max_pending_asset_requests : Int32
+  max_asset_response_bytes : Int32
+  asset_response_timeout_millis : Int32
 } derive(Eq, @debug.Debug)
-pub fn WebViewResourceLimits::new(max_page_message_bytes? : Int, max_pending_asset_requests? : Int, max_asset_response_bytes? : Int, asset_response_timeout_millis? : Int) -> Self
+pub fn WebViewResourceLimits::new(max_page_message_bytes? : Int32, max_pending_asset_requests? : Int32, max_asset_response_bytes? : Int32, asset_response_timeout_millis? : Int32) -> Self
 
 // Type aliases
 

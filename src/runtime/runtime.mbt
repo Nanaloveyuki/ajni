@@ -5,7 +5,7 @@ fn check_native_status() -> Unit raise RuntimeError {
 
 ///|
 /// Internal seam for the explicitly unsafe and optional host packages.
-pub fn internal_check_status(status : Int) -> Unit raise RuntimeError {
+pub fn internal_check_status(status : Int32) -> Unit raise RuntimeError {
   match status {
     0 => ()
     1 => raise UnsupportedTarget
@@ -172,7 +172,7 @@ pub fn Session::new_string(
 pub fn Session::new_primitive_array(
   self : Session,
   element_type : @ajni.JniType,
-  length : Int,
+  length : Int32,
 ) -> JavaObject raise RuntimeError {
   let tag = match element_type.descriptor() {
     "Z" => 1
@@ -220,7 +220,7 @@ pub fn JavaObject::to_string_value(
 }
 
 ///|
-pub fn JavaObject::array_length(self : JavaObject) -> Int raise RuntimeError {
+pub fn JavaObject::array_length(self : JavaObject) -> Int32 raise RuntimeError {
   let result = native_array_length(self.native)
   check_native_status()
   result
@@ -229,7 +229,7 @@ pub fn JavaObject::array_length(self : JavaObject) -> Int raise RuntimeError {
 ///|
 pub fn JavaObject::get_element(
   self : JavaObject,
-  index : Int,
+  index : Int32,
 ) -> JavaValue raise RuntimeError {
   let result = native_array_get(self.native, index)
   check_native_status()
@@ -239,7 +239,7 @@ pub fn JavaObject::get_element(
 ///|
 pub fn JavaObject::set_element(
   self : JavaObject,
-  index : Int,
+  index : Int32,
   value : JavaValue,
 ) -> Unit raise RuntimeError {
   if value is Void {
@@ -254,8 +254,8 @@ pub fn JavaObject::set_element(
 /// Copies the requested region; no Java memory remains pinned across this call.
 pub fn JavaObject::read_region(
   self : JavaObject,
-  start : Int,
-  length : Int,
+  start : Int32,
+  length : Int32,
 ) -> Array[JavaValue] raise RuntimeError {
   let result = native_array_read(self.native, start, length)
   check_native_status()
@@ -265,7 +265,7 @@ pub fn JavaObject::read_region(
 ///|
 pub fn JavaObject::write_region(
   self : JavaObject,
-  start : Int,
+  start : Int32,
   values : ArrayView[JavaValue],
 ) -> Unit raise RuntimeError {
   let args = encode_args(values)
@@ -358,7 +358,7 @@ pub fn JavaClass::static_field(
 ///|
 pub fn JavaClass::new_object_array(
   self : JavaClass,
-  length : Int,
+  length : Int32,
   initial? : JavaObject,
 ) -> JavaObject raise RuntimeError {
   let initial = nullable_object(initial)

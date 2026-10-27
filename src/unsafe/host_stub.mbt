@@ -2,7 +2,7 @@
 #cfg(not(target="native"))
 pub fn host_open(
   _env : UInt64,
-  class_loader? : UInt64 = 0,
+  class_loader~ : UInt64 = 0,
 ) -> @runtime.Session raise @runtime.RuntimeError {
   let _ = class_loader
   raise @runtime.UnsupportedTarget

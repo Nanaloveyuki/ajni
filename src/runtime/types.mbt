@@ -55,10 +55,10 @@ pub struct JavaCallback {
 pub(all) enum JavaValue {
   Void
   Boolean(Bool)
-  Byte(Int)
-  Char(Int)
-  Short(Int)
-  Int(Int)
+  Byte(Int32)
+  Char(Int32)
+  Short(Int32)
+  Int(Int32)
   Long(Int64)
   Float(Float)
   Double(Double)
@@ -122,7 +122,7 @@ pub fn Session::new_string(
 pub fn Session::new_primitive_array(
   _self : Session,
   _element_type : @ajni.JniType,
-  _length : Int,
+  _length : Int32,
 ) -> JavaObject raise RuntimeError {
   raise UnsupportedTarget
 }
@@ -162,7 +162,7 @@ pub fn JavaObject::to_string_value(
 
 ///|
 #cfg(not(target="native"))
-pub fn JavaObject::array_length(_self : JavaObject) -> Int raise RuntimeError {
+pub fn JavaObject::array_length(_self : JavaObject) -> Int32 raise RuntimeError {
   raise UnsupportedTarget
 }
 
@@ -170,7 +170,7 @@ pub fn JavaObject::array_length(_self : JavaObject) -> Int raise RuntimeError {
 #cfg(not(target="native"))
 pub fn JavaObject::get_element(
   _self : JavaObject,
-  _index : Int,
+  _index : Int32,
 ) -> JavaValue raise RuntimeError {
   raise UnsupportedTarget
 }
@@ -179,7 +179,7 @@ pub fn JavaObject::get_element(
 #cfg(not(target="native"))
 pub fn JavaObject::set_element(
   _self : JavaObject,
-  _index : Int,
+  _index : Int32,
   _value : JavaValue,
 ) -> Unit raise RuntimeError {
   raise UnsupportedTarget
@@ -189,8 +189,8 @@ pub fn JavaObject::set_element(
 #cfg(not(target="native"))
 pub fn JavaObject::read_region(
   _self : JavaObject,
-  _start : Int,
-  _length : Int,
+  _start : Int32,
+  _length : Int32,
 ) -> Array[JavaValue] raise RuntimeError {
   raise UnsupportedTarget
 }
@@ -199,7 +199,7 @@ pub fn JavaObject::read_region(
 #cfg(not(target="native"))
 pub fn JavaObject::write_region(
   _self : JavaObject,
-  _start : Int,
+  _start : Int32,
   _values : ArrayView[JavaValue],
 ) -> Unit raise RuntimeError {
   raise UnsupportedTarget
@@ -258,7 +258,7 @@ pub fn JavaClass::static_field(
 #cfg(not(target="native"))
 pub fn JavaClass::new_object_array(
   _self : JavaClass,
-  _length : Int,
+  _length : Int32,
   initial? : JavaObject,
 ) -> JavaObject raise RuntimeError {
   let _ = initial
@@ -314,7 +314,7 @@ pub fn JavaCallback::close(_self : JavaCallback) -> Unit raise RuntimeError {
 
 ///|
 #cfg(not(target="native"))
-pub fn internal_check_status(_status : Int) -> Unit raise RuntimeError {
+pub fn internal_check_status(_status : Int32) -> Unit raise RuntimeError {
   raise UnsupportedTarget
 }
 

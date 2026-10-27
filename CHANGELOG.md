@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Upgrade the pinned compiler archive to `0.10.17+d971670cd` and `moon` CLI to `0.1.20261023`; retain both pins in source packages and use the exact compiler assertion in CI. JNI APIs and Android/OHOS platform contracts are unchanged.
+- Retain Android and WebView's shared native-stub dependencies with package-local unused-import exemptions; no dummy managed calls or runtime API changes are needed.
 - Add an isolated, unpublished Harmony NAPI validation fixture with MoonBit C embedding, a Stage host, bounded owner-thread callbacks, and repeatable DevEco/HDC runners. API26 x86_64 emulator validation covers 13 runtime scenarios and Worker-owner termination cleanup; arm64 is build-only, independent OpenHarmony runtime and ArkWeb remain unverified. Published JNI APIs are unchanged.
 
 ## 0.3.1
