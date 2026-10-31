@@ -1,0 +1,8 @@
+import {
+  "Nanaloveyuki/ajni",
+}
+
+options(
+  "native-stub": [ "ajni_runtime.c" ],
+  targets: { "ffi.mbt": [ "native" ], "runtime.mbt": [ "native" ] },
+)

@@ -1,4 +1,6 @@
 import {
+  "Nanaloveyuki/ajni" @jni,
+  "Nanaloveyuki/ajni/runtime",
   "Nanaloveyuki/ajni/android",
   "Nanaloveyuki/ajni/webview",
 }
@@ -11,6 +13,8 @@ options(
       "exports": [
         "dispatch:ajni_dispatch_event",
         "dispatch_webview:ajni_dispatch_webview_event",
+        "create_int_callback:ajni_create_int_callback",
+        "handled_observer_error:ajni_handled_observer_error",
       ],
     },
   },

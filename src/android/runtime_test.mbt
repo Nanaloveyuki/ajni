@@ -14,7 +14,7 @@ test "lifecycle and surface event mapping" {
 
 ///|
 test "handler mutation preserves current snapshot and refreshes nested dispatch" {
-  let visits : Map[(Int, Int), Int] = Map([])
+  let visits : Map[(Int32, Int32), Int32] = Map([])
   let b = Ref(0)
   let c = Ref(0)
   let a = @android.install_event_handler(fn(event) {

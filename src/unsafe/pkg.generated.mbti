@@ -1,0 +1,39 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Nanaloveyuki/ajni/unsafe"
+
+import {
+  "Nanaloveyuki/ajni/runtime",
+}
+
+// Values
+pub fn export_local(@runtime.JavaObject, UInt64) -> UInt64 raise @runtime.RuntimeError
+
+pub fn host_close(UInt64) -> Unit raise @runtime.RuntimeError
+
+pub fn host_enter(UInt64) -> Unit raise @runtime.RuntimeError
+
+pub fn host_leave() -> Unit raise @runtime.RuntimeError
+
+pub fn host_open(UInt64, class_loader? : UInt64) -> @runtime.Session raise @runtime.RuntimeError
+
+pub fn host_throw(UInt64) -> Unit raise @runtime.RuntimeError
+
+pub fn import_class(@runtime.Session, UInt64, UInt64) -> @runtime.JavaClass raise @runtime.RuntimeError
+
+pub fn import_object(@runtime.Session, UInt64, UInt64) -> @runtime.JavaObject raise @runtime.RuntimeError
+
+pub fn raw_env(@runtime.Session) -> UInt64 raise @runtime.RuntimeError
+
+pub fn raw_vm(@runtime.Session) -> UInt64 raise @runtime.RuntimeError
+
+pub fn register_companion(UInt64) -> Unit raise @runtime.RuntimeError
+
+pub fn register_native(@runtime.JavaClass, String, String, UInt64) -> Unit raise @runtime.RuntimeError
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

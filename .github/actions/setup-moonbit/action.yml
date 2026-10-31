@@ -1,5 +1,5 @@
 name: Setup pinned MoonBit
-description: Install the Linux toolchain pinned in .moon-version and its dependencies.
+description: Install the Linux toolchain pinned in .moonbit-toolchain and .moon-version and prime the registry index.
 
 runs:
   using: composite
@@ -8,9 +8,10 @@ runs:
       shell: bash --noprofile --norc -euo pipefail {0}
       run: |
         [[ "$RUNNER_OS" == Linux ]]
-        read -r moon_version < .moon-version
+        # Archives use the compiler release, not the moon CLI version in .moon-version.
+        read -r toolchain_version < .moonbit-toolchain
         curl -fsSL https://cli.moonbitlang.com/install/unix.sh -o "$RUNNER_TEMP/moonbit-install.sh"
-        bash "$RUNNER_TEMP/moonbit-install.sh" "$moon_version"
+        bash "$RUNNER_TEMP/moonbit-install.sh" "$toolchain_version"
         echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
         echo "MOON_HOME=$HOME/.moon" >> "$GITHUB_ENV"
     - name: Verify pinned MoonBit version
@@ -20,10 +21,10 @@ runs:
         installed_version="$(moon version)"
         printf '%s\n' "$installed_version"
         [[ "$installed_version" == "moon $moon_version ("* ]]
+        installed_compiler_version="$(moonc -v)"
+        printf '%s\n' "$installed_compiler_version"
+        [[ "$installed_compiler_version" == "v0.10.18+6c83a7f62 (2026-10-28)" ]]
         moon version --all
     - name: Update MoonBit registry
       shell: bash --noprofile --norc -euo pipefail {0}
       run: moon update
-    - name: Install MoonBit dependencies
-      shell: bash --noprofile --norc -euo pipefail {0}
-      run: moon install

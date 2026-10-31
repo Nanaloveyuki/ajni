@@ -1,0 +1,13 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Nanaloveyuki/ajni-jvm-smoke"
+
+// Values
+pub fn smoke_run(Int32) -> Int32
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

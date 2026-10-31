@@ -1,6 +1,6 @@
 import {
   "Nanaloveyuki/ajni",
-  "Nanaloveyuki/ajni/android", // Required native linkage for shared lease/error symbols.
+  "Nanaloveyuki/ajni/android",
   "moonbitlang/core/encoding/base64",
   "moonbitlang/core/encoding/utf8",
 }
@@ -8,6 +8,10 @@ import {
 import {
   "moonbitlang/core/quickcheck",
 } for "wbtest"
+
+// ajni_webview_bridge.c uses android's native lease/error symbols, not managed APIs.
+
+warnings = "-unused_package"
 
 options(
   "native-stub": [ "ajni_webview_bridge.c" ],

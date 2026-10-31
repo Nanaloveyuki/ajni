@@ -48,6 +48,8 @@ NATIVES = (
     Native("nativeOnUiTask", "(I)V", "ajni_native_on_ui_task", "core"),
     Native("nativeStartWorker", "()V", "ajni_native_start_worker", "core"),
     Native("nativeEcho", "(Ljava/lang/String;)Ljava/lang/String;", "ajni_native_echo", "core"),
+    Native("nativeCreateIntCallback", "()Ldev/nanaloveyuki/ajni/AjniCallback;", "ajni_native_create_int_callback", "core"),
+    Native("nativeHandledObserverError", "()Z", "ajni_native_handled_observer_error", "core"),
     Native("nativeWebViewEvent", "(IJLjava/lang/String;Ljava/lang/String;)V", "ajni_native_webview_event", "webview"),
 )
 UPCALLS = {
@@ -57,6 +59,14 @@ UPCALLS = {
 }
 EXPECTED = {item.name: item.descriptor for item in NATIVES}
 EXPECTED.update({name: spec[0] for name, spec in UPCALLS.items()})
+COMPANION_RULES = {
+    "dev.nanaloveyuki.ajni.AjniCallback": {
+        "public <init>(long)",
+        "private static native java.lang.Object dispatch(long, java.lang.Object[])",
+        "private static native void close(long)",
+    },
+    "dev.nanaloveyuki.ajni.AjniException": {"public <init>(java.lang.String)"},
+}
 
 
 def require(condition, message):
@@ -166,7 +176,7 @@ def parse_javap(text):
 
 
 def check_bytecode(text):
-    """Validate all ten natives and three private static boolean upcalls."""
+    """Validate all bridge natives and three private static boolean upcalls."""
     methods = parse_javap(text)
     found = {}
     for name, descriptor in EXPECTED.items():
@@ -430,8 +440,9 @@ def check_registration(tokens, functions, natives, owner):
     return entries
 
 
-C_TYPES = {"I": "jint", "J": "jlong", "V": "void", "Ljava/lang/String;": "jstring",
-           "Landroid/content/Context;": "jobject", "Landroid/view/Surface;": "jobject"}
+C_TYPES = {"I": "jint", "J": "jlong", "Z": "jboolean", "V": "void", "Ljava/lang/String;": "jstring",
+           "Landroid/content/Context;": "jobject", "Landroid/view/Surface;": "jobject",
+           "Ldev/nanaloveyuki/ajni/AjniCallback;": "jobject"}
 
 
 def expected_c_signature(native):
@@ -557,11 +568,21 @@ def java_type_descriptor(value, allow_void=False):
 
 
 def parse_keep_rules(text):
-    """Parse the exact NativeBridge keep block; reject every unconsumed rule/member."""
+    """Parse exact bridge and companion rules, rejecting unconsumed members."""
     text = re.sub(r"#[^\n]*", "", text)
-    match = re.fullmatch(r"\s*-keep\s+class\s+" + re.escape(BRIDGE_CLASS) + r"\s*\{([^{}]*)\}\s*", text)
-    require(match is not None, "keep rules: expected exactly one precise NativeBridge -keep class block")
-    body = match.group(1)
+    blocks = list(re.finditer(r"-keep\s+class\s+([A-Za-z_$.][A-Za-z0-9_$.]*)\s*\{([^{}]*)\}", text))
+    require(not re.sub(r"-keep\s+class\s+[A-Za-z_$.][A-Za-z0-9_$.]*\s*\{[^{}]*\}", "", text).strip(),
+            "keep rules: unsupported content outside exact class blocks")
+    classes = {block.group(1): block.group(2) for block in blocks}
+    require(len(classes) == len(blocks) and set(classes) == {BRIDGE_CLASS, *COMPANION_RULES},
+            "keep rules: expected precise NativeBridge and Java companion blocks")
+    for name, expected in COMPANION_RULES.items():
+        entries = classes[name].split(";")
+        require(not entries[-1].strip(), "keep rules: unterminated companion member")
+        members = [" ".join(entry.split()) for entry in entries[:-1]]
+        require(len(members) == len(expected) and set(members) == expected,
+                "keep rules: companion member mismatch for " + name)
+    body = classes[BRIDGE_CLASS]
     result = {}
     members = body.split(";")
     require(not members[-1].strip(), "keep rules: unterminated member")
@@ -669,11 +690,15 @@ def compile_native_contract(stubs, compilers, moon_home):
             unit = Path(temporary) / (source + "-contract.c")
             unit.write_text(translation_unit(stub, [item for item in NATIVES if item.source == source]), encoding="utf-8")
             units[source] = unit
+        runtime_unit = Path(temporary) / "runtime-contract.c"
+        runtime_unit.write_text("#include " + json.dumps(str(ROOT / "src/runtime/ajni_runtime.c")) + "\n", encoding="utf-8")
+        units["runtime"] = runtime_unit
         for abi, compiler in compilers.items():
             for configuration, defines in configurations.items():
                 for source, unit in units.items():
                     command = [compiler, "-std=c11", "-Wall", "-Wextra", "-Werror", "-fsyntax-only",
-                               "-I" + str(include), "-I" + str(ROOT / "src/android"), *defines, unit]
+                               "-I" + str(include), "-I" + str(ROOT / "src/android"),
+                               "-I" + str(ROOT / "src/runtime"), *defines, unit]
                     run_tool(command, f"Android API24 {abi} / {configuration} / {source}")
                 checked.append((abi, configuration))
     return checked
@@ -724,10 +749,10 @@ def main(argv=None):
     except OSError as error:
         print("JNI contract input/tool access failed: " + str(error), file=sys.stderr)
         return 2
-    print("JNI static contract passed: 10 native methods, 3 boolean upcalls, 13 exact keep members.")
+    print("JNI static contract passed: 12 native methods, 3 boolean upcalls, exact bridge/companion keep members.")
     print("Bytecode: " + str(class_file))
     for abi, configuration in checked:
-        print(f"Android API24 {abi}: {configuration}; real core/WebView definitions and _Generic prototypes (-Werror, syntax-only).")
+        print(f"Android API24 {abi}: {configuration}; real runtime/core/WebView definitions and _Generic prototypes (-Werror, syntax-only).")
     print("Manual ABI review still required for JNI varargs (the checks prove association/count, not expression types):")
     for name, arguments in expressions.items():
         print("  " + name + ": " + "; ".join(kind + " <- " + expression for kind, expression in arguments))

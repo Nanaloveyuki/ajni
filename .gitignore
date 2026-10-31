@@ -2,6 +2,7 @@
 ref/
 _build/
 .moon/
+.mooncakes/
 android/.gradle/
 android/.kotlin/
 android/local.properties
@@ -9,6 +10,12 @@ android/**/build/
 android/**/.cxx/
 android/.idea/
 tmp/
+.hvigor/
+tests/ohos/app/**/build/
+tests/ohos/app/**/.cxx/
+tests/ohos/app/**/oh_modules/
+tests/ohos/app/local.properties
+tests/ohos/app/build-profile.local.json5
 
 # editor
 .idea/

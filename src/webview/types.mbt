@@ -50,10 +50,10 @@ pub extend InitialContent with Debug::{to_repr}
 /// Per-view host quotas. Zero disables an individual quota; negative values
 /// are rejected before the command crosses JNI.
 pub struct WebViewResourceLimits {
-  max_page_message_bytes : Int
-  max_pending_asset_requests : Int
-  max_asset_response_bytes : Int
-  asset_response_timeout_millis : Int
+  max_page_message_bytes : Int32
+  max_pending_asset_requests : Int32
+  max_asset_response_bytes : Int32
+  asset_response_timeout_millis : Int32
 } derive(Eq, Debug)
 
 ///|
@@ -68,10 +68,10 @@ pub extend WebViewResourceLimits with Debug::{to_repr}
 
 ///|
 pub fn WebViewResourceLimits::new(
-  max_page_message_bytes? : Int = 1048576,
-  max_pending_asset_requests? : Int = 32,
-  max_asset_response_bytes? : Int = 8388608,
-  asset_response_timeout_millis? : Int = 10000,
+  max_page_message_bytes~ : Int32 = 1048576,
+  max_pending_asset_requests~ : Int32 = 32,
+  max_asset_response_bytes~ : Int32 = 8388608,
+  asset_response_timeout_millis~ : Int32 = 10000,
 ) -> WebViewResourceLimits {
   {
     max_page_message_bytes,
@@ -126,7 +126,7 @@ pub fn AssetHeader::new(name~ : String, value~ : String) -> AssetHeader {
 /// A complete embedded-asset response. The host owns timeout and pending
 /// request limits; this package only serialises the accepted response.
 pub struct AssetResponse {
-  status : Int
+  status : Int32
   mime_type : String
   encoding : String
   headers : Array[AssetHeader]
@@ -145,11 +145,11 @@ pub extend AssetResponse with Debug::{to_repr}
 
 ///|
 pub fn AssetResponse::new(
-  status~ : Int,
+  status~ : Int32,
   mime_type~ : String,
-  encoding? : String = "utf-8",
-  headers? : Array[AssetHeader] = [],
-  body? : Bytes = b"",
+  encoding~ : String = "utf-8",
+  headers~ : Array[AssetHeader] = [],
+  body~ : Bytes = b"",
 ) -> AssetResponse {
   { status, mime_type, encoding, headers, body, }
 }

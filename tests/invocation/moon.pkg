@@ -1,0 +1,13 @@
+import {
+  "Nanaloveyuki/ajni" @jni,
+  "Nanaloveyuki/ajni/runtime" @rt,
+  "Nanaloveyuki/ajni/unsafe" @raw,
+  "Nanaloveyuki/ajni/invocation",
+  "moonbitlang/core/env",
+}
+
+pkgtype(kind: "executable")
+
+options(
+  "native-stub": [ "bridge.c" ],
+)

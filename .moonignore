@@ -3,6 +3,7 @@ ref/
 tmp/
 _build/
 .moon/
+.hvigor/
 android/.gradle/
 android/.kotlin/
 android/local.properties
@@ -12,6 +13,16 @@ android/.idea/
 .idea/
 *.iml
 scripts/__pycache__/
+tests/**/.mooncakes/
+tests/**/_build/
+tests/**/__pycache__/
 
-# Published Android build scripts read this pin too.
+# Harmony verification is a separate, unpublished SDK/Stage application.
+tests/ohos/
+scripts/build-ohos-mvp.py
+scripts/run-ohos-mvp.py
+
+# Preserve both toolchain pins alongside the published Android build scripts.
 !/.moon-version
+!/.moonbit-toolchain
+!/.moonignore

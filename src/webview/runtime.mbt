@@ -1,13 +1,13 @@
 ///|
-let handlers : Map[Int, (Event) -> Unit] = Map([])
+let handlers : Map[Int32, (Event) -> Unit] = Map([])
 
 ///|
-let next_handler_id : Ref[Int] = Ref(1)
+let next_handler_id : Ref[Int32] = Ref(1)
 
 ///|
 /// Registers a process-wide, non-thread-safe observer. Use the main thread or
 /// serialized bootstrap before callbacks; subscriptions survive shutdown/reinit.
-pub fn install_event_handler(handler : (Event) -> Unit) -> Int {
+pub fn install_event_handler(handler : (Event) -> Unit) -> Int32 {
   let id = next_handler_id.val
   next_handler_id.val = id + 1
   handlers.set(id, handler)
@@ -16,7 +16,7 @@ pub fn install_event_handler(handler : (Event) -> Unit) -> Int {
 
 ///|
 /// Removes the token from future snapshots, not an already captured snapshot.
-pub fn remove_event_handler(id : Int) -> Unit {
+pub fn remove_event_handler(id : Int32) -> Unit {
   ignore(handlers.remove(id))
 }
 
@@ -27,9 +27,9 @@ pub fn create(
   handle : Int64,
   trusted_origin : String,
   initial_content : InitialContent,
-  document_start_scripts? : Array[String] = [],
-  resource_limits? : WebViewResourceLimits = WebViewResourceLimits::new(),
-  operation_id? : String = "",
+  document_start_scripts~ : Array[String] = [],
+  resource_limits~ : WebViewResourceLimits = WebViewResourceLimits::new(),
+  operation_id~ : String = "",
 ) -> Unit raise @ajni.JniError {
   if !valid_resource_limits(resource_limits) {
     raise NativeFailure("WebView resource limits must not be negative")
@@ -87,7 +87,7 @@ fn encode_create_options(
 pub fn navigate(
   handle : Int64,
   url : String,
-  operation_id? : String = "",
+  operation_id~ : String = "",
 ) -> Unit raise @ajni.JniError {
   command(2, handle, url, operation_id)
 }
@@ -97,7 +97,7 @@ pub fn load_html_with_base_url(
   handle : Int64,
   html : String,
   base_url : String,
-  operation_id? : String = "",
+  operation_id~ : String = "",
 ) -> Unit raise @ajni.JniError {
   command(
     7,
@@ -111,7 +111,7 @@ pub fn load_html_with_base_url(
 pub fn add_document_start_script(
   handle : Int64,
   script : String,
-  operation_id? : String = "",
+  operation_id~ : String = "",
 ) -> Unit raise @ajni.JniError {
   command(10, handle, encode_fields([("script", script)]), operation_id)
 }
@@ -129,7 +129,7 @@ pub fn eval(
 pub fn post_message(
   handle : Int64,
   body : String,
-  operation_id? : String = "",
+  operation_id~ : String = "",
 ) -> Unit raise @ajni.JniError {
   command(8, handle, encode_fields([("body", body)]), operation_id)
 }
@@ -139,7 +139,7 @@ pub fn respond_asset(
   handle : Int64,
   request_id : String,
   response : AssetResponse,
-  operation_id? : String = "",
+  operation_id~ : String = "",
 ) -> Unit raise @ajni.JniError {
   command(9, handle, encode_asset_response(request_id, response), operation_id)
 }
@@ -147,7 +147,7 @@ pub fn respond_asset(
 ///|
 pub fn destroy(
   handle : Int64,
-  operation_id? : String = "",
+  operation_id~ : String = "",
 ) -> Unit raise @ajni.JniError {
   command(5, handle, "", operation_id)
 }
@@ -155,17 +155,17 @@ pub fn destroy(
 ///|
 pub fn set_bounds(
   handle : Int64,
-  x : Int,
-  y : Int,
-  width : Int,
-  height : Int,
+  x : Int32,
+  y : Int32,
+  width : Int32,
+  height : Int32,
 ) -> Unit raise @ajni.JniError {
   check_native_status(native_set_bounds(handle, x, y, width, height))
 }
 
 ///|
 fn command(
-  command : Int,
+  command : Int32,
   handle : Int64,
   payload : String,
   request_id : String,
@@ -181,7 +181,7 @@ fn command(
 }
 
 ///|
-fn check_native_status(status : Int) -> Unit raise @ajni.JniError {
+fn check_native_status(status : Int32) -> Unit raise @ajni.JniError {
   match status {
     1 => ()
     0 => raise NotInitialized
@@ -257,7 +257,7 @@ fn valid_resource_limits(limits : WebViewResourceLimits) -> Bool {
 /// Synchronous UTF-8 export; serialize with observer mutation. Dispatch snapshots
 /// have no order guarantee; nested dispatch takes a fresh snapshot on this thread.
 pub fn dispatch_from_android(
-  kind : Int,
+  kind : Int32,
   handle : Int64,
   payload : Bytes,
   detail : Bytes,
@@ -390,7 +390,7 @@ fn valid_field_name(name : String) -> Bool {
   }
   for byte in @ajni.encode_utf8(name) {
     match byte {
-      b'a'..=b'z' | b'_' => ()
+      b'a'..<=b'z' | b'_' => ()
       _ => return false
     }
   }
@@ -412,7 +412,7 @@ fn decode_base64url(value : String) -> String? {
         b'-' => b'+'
         b'_' => b'/'
         b'=' => b'='
-        b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' => byte
+        b'A'..<=b'Z' | b'a'..<=b'z' | b'0'..<=b'9' => byte
         _ => return None
       },
     )

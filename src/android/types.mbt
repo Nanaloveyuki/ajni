@@ -25,8 +25,8 @@ pub extend Lifecycle with Debug::{to_repr}
 /// JNI bridge.
 pub(all) enum AndroidEvent {
   Lifecycle(Lifecycle)
-  SurfaceCreated(Int, Int)
-  SurfaceChanged(Int, Int)
+  SurfaceCreated(Int32, Int32)
+  SurfaceChanged(Int32, Int32)
   SurfaceDestroyed
   WorkerAttached
   UiTask
