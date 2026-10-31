@@ -7,6 +7,7 @@
 - Remove the closed `BUGFIX_PLAN.md`: its per-item outcomes remain in the `0.2.5`/`0.2.6` changelog entries and its remaining limits in ADR 0001/0002, so `docs/` keeps only ADRs.
 - Align the checked-JVM fixture dependencies with ajni `0.3.3`.
 - JNI APIs, Android/OHOS platform contracts and runtime behavior are unchanged.
+- `0.3.2` reached Mooncakes only: its tag predates the CI repair, so `v0.3.3` is the first GitHub Release after `v0.3.1`.
 
 ## 0.3.2
 
