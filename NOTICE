@@ -1,0 +1,32 @@
+ajni
+Copyright 2026 Nanaloveyuki
+
+This product is licensed under the Apache License, Version 2.0. See LICENSE for the
+full text. It includes, links or redistributes the third-party components below;
+each remains subject to its own license terms.
+
+## Distributed or linked components
+
+- MoonBit core runtime (moonbitlang/core) — Apache License 2.0.
+  Native artifacts link MoonBit-generated C against this runtime.
+- Nanaloveyuki/dynlib — Apache License 2.0.
+  Optional JVM library loading used by the `ajni/invocation` package.
+- AndroidX WebKit 1.12.1, AndroidX Activity, AndroidX Lifecycle — Apache License 2.0.
+- AndroidX Test and Espresso — Apache License 2.0. Test and instrumentation only.
+- Kotlin standard library — Apache License 2.0.
+- Gradle Wrapper (`android/gradle/wrapper`) — Apache License 2.0.
+
+## Build and CI tooling (not redistributed)
+
+- actions/checkout, actions/setup-java, actions/upload-artifact,
+  actions/download-artifact — MIT License.
+- android-actions/setup-android — MIT License.
+- gradle/actions (`setup-gradle` v6) — MIT License for the action runner and the
+  basic caching provider. v6 also vendors `gradle-actions-caching`, a proprietary
+  component governed by the Gradle Technologies Terms of Use; ajni's CI selects
+  `cache-provider: basic`, so that component is neither loaded nor used.
+- Android SDK platform tools, build tools, NDK and CMake — Apache License 2.0.
+- Java Development Kit used for local checked-JNI runs — GPLv2 with Classpath
+  Exception. Not redistributed.
+
+License texts and notices are available at the respective upstream projects.

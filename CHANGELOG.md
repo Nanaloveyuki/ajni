@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.4
+
+- Add `NOTICE` with the third-party license inventory for linked, redistributed and build-time components, and require it in the publication file gate. `gradle/actions/setup-gradle@v6` is pinned to its MIT-covered `cache-provider: basic`, because v6's default enhanced cache loads the proprietary `gradle-actions-caching` component; Dependabot now requires a manual license review for `gradle/actions` major bumps.
+- Update GitHub Actions to `actions/checkout@v7`, `actions/setup-java@v6`, `actions/upload-artifact@v7`, `actions/download-artifact@v8` and `android-actions/setup-android@v4`. An upload-v7 to download-v8 artifact round-trip was exercised separately, because pull-request CI never runs the release download path.
+- Align the checked-JVM fixture dependencies with ajni `0.3.4`.
+- No MoonBit API, runtime behavior, ABI or platform contract changes.
+
 ## 0.3.3
 
 - Upgrade the pinned compiler archive to `0.10.18+6c83a7f62` and `moon` CLI to `0.1.20261028`; CI keeps the exact compiler assertion in `.github/actions/setup-moonbit`. Source, public interfaces and generated `.mbti` files need no changes, and `moon check --target native` reports no warnings.

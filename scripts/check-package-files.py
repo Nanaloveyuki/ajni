@@ -7,7 +7,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = {
-    '.moon-version', '.moonbit-toolchain', '.moonignore', 'moon.mod', 'README.md', 'LICENSE',
+    '.moon-version', '.moonbit-toolchain', '.moonignore', 'moon.mod', 'README.md',
+    'LICENSE', 'NOTICE',
     'src/moon.pkg', 'src/android/moon.pkg', 'src/webview/moon.pkg',
     'src/android/ajni_bridge.c', 'src/android/ajni_android_internal.h',
     'src/android/android_compat.h', 'src/webview/ajni_webview_bridge.c',

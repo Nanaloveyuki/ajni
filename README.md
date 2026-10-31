@@ -354,3 +354,9 @@ is skipped.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for feature boundaries, validation, and
 pull request requirements.
+
+## License
+
+ajni is licensed under the Apache License, Version 2.0; see [LICENSE](LICENSE).
+[NOTICE](NOTICE) lists the third-party components it links or redistributes and
+the build tooling it depends on.
