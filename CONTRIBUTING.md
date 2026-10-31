@@ -18,7 +18,9 @@ not CLI versions. For Linux/macOS, pass the contents of `.moonbit-toolchain` to 
 installer. On Windows, set `MOONBIT_INSTALL_VERSION` to the same archive ID before running
 the official PowerShell installer. Run `moon update` once to fetch the registry index; module
 dependencies then resolve during `moon check` or `moon build`, because `moon install` only
-installs global binary packages and requires an explicit `<SOURCE>`.
+installs global binary packages and requires an explicit `<SOURCE>`. `moon package --list
+--frozen` inspects the already-synced module directory and cannot fetch anything itself, so
+run it after a check or build.
 
 The root pins also apply to `tests/jvm`, `tests/invocation`, and the unpublished `tests/ohos`
 module. Android build work additionally needs Android SDK platform 35,
