@@ -132,6 +132,9 @@ and tests whenever observable behavior changes. Do not commit `_build`,
 verifies both the `.moon-version` CLI pin and exact compiler version, and primes the
 registry index with `moon update`. Module dependencies resolve during `moon check`, so
 the setup does not call `moon install`; that command only installs global binaries.
+The Gradle job pins `gradle/actions/setup-gradle@v6` with `cache-provider: basic`: v6's
+default `enhanced` provider loads the proprietary `gradle-actions-caching` component,
+while the basic provider keeps CI on the MIT-licensed GitHub Actions cache.
 `Build` separates MoonBit/package checks from Android JNI/lint/build checks;
 the always-running `ci` job fails if either job fails, is cancelled, or is skipped.
 Configure branch protection to require `ci` (replacing the former `checks` job)
