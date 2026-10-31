@@ -55,14 +55,14 @@ jobs:
           moon package --frozen
           moon doc --frozen
       - name: Upload module package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ajni-package
           path: _build/publish/*.zip
           if-no-files-found: error
           retention-days: 30
       - name: Upload API documentation
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ajni-api-docs
           path: _build/doc/
@@ -107,7 +107,7 @@ jobs:
           ./gradlew :host:checkJniContract :host:lintDebug :host:assembleDebug :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --no-daemon --stacktrace
         working-directory: android
       - name: Upload Android debug artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ajni-android-debug
           path: |
@@ -118,7 +118,7 @@ jobs:
           retention-days: 30
       - name: Upload Android diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ajni-android-reports
           path: android/**/build/reports/
