@@ -12,12 +12,16 @@ Before MoonBit 1.0, preserve the existing behavior while the general JNI seam is
 
 ## Development Setup
 
-Install toolchain archive `0.10.17+d971670cd`, recorded in `.moonbit-toolchain`, JDK 21 for JVM smoke and Java 17 for Android builds.
-Its `moon` CLI version is `0.1.20261023`, recorded in `.moon-version`; archive IDs are compiler versions,
+Install toolchain archive `0.10.18+6c83a7f62`, recorded in `.moonbit-toolchain`, JDK 21 for JVM smoke and Java 17 for Android builds.
+Its `moon` CLI version is `0.1.20261028`, recorded in `.moon-version`; archive IDs are compiler versions,
 not CLI versions. For Linux/macOS, pass the contents of `.moonbit-toolchain` to the official
 installer. On Windows, set `MOONBIT_INSTALL_VERSION` to the same archive ID before running
-the official PowerShell installer. The root pins also apply to `tests/jvm`,
-`tests/invocation`, and the unpublished `tests/ohos` module. Android build work additionally needs Android SDK platform 35,
+the official PowerShell installer. Run `moon update` once to fetch the registry index; module
+dependencies then resolve during `moon check` or `moon build`, because `moon install` only
+installs global binary packages and requires an explicit `<SOURCE>`.
+
+The root pins also apply to `tests/jvm`, `tests/invocation`, and the unpublished `tests/ohos`
+module. Android build work additionally needs Android SDK platform 35,
 platform tools, NDK `29.0.14206865`, CMake `4.1.2`, and the bundled Gradle
 `8.10.2` wrapper.
 
@@ -121,8 +125,10 @@ and tests whenever observable behavior changes. Do not commit `_build`,
 
 ## CI Infrastructure
 
-`.github/actions/setup-moonbit` installs the `.moonbit-toolchain` compiler archive on Linux
-and verifies both the `.moon-version` CLI pin and exact compiler version.
+`.github/actions/setup-moonbit` installs the `.moonbit-toolchain` compiler archive on Linux,
+verifies both the `.moon-version` CLI pin and exact compiler version, and primes the
+registry index with `moon update`. Module dependencies resolve during `moon check`, so
+the setup does not call `moon install`; that command only installs global binaries.
 `Build` separates MoonBit/package checks from Android JNI/lint/build checks;
 the always-running `ci` job fails if either job fails, is cancelled, or is skipped.
 Configure branch protection to require `ci` (replacing the former `checks` job)
@@ -179,7 +185,7 @@ same validated source ZIP to Mooncakes after GitHub Release creation:
 3. The release job writes credentials with mode `0600` only for publishing,
    extracts the validated source artifact, resolves dependencies with `moon check`,
    validates its publication file list, then runs `moon publish`. The pinned
-   publisher rechecks a fresh extraction, so `--frozen` cannot install its dependencies.
+   publisher rechecks a fresh extraction, so `--frozen` cannot sync its dependencies.
    `.moonignore` must ship with the archive to preserve both toolchain pins on repack.
    Credentials are removed on exit and in an always-running cleanup step; no
    secret is exposed to pull requests or cached/uploaded with MoonBit home.

@@ -37,8 +37,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Resolve optional invocation dependency
-        run: moon update
       - name: Check published file list
         run: python3 scripts/check-package-files.py
       - name: Check formatting and exported interfaces
@@ -81,8 +79,6 @@ jobs:
           persist-credentials: false
       - name: Setup pinned MoonBit
         uses: ./.github/actions/setup-moonbit
-      - name: Resolve optional invocation dependency
-        run: moon update
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
