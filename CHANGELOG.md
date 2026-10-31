@@ -1,10 +1,42 @@
 # Changelog
 
-## Unreleased
+## 0.3.3
 
-- Split reusable CI into MoonBit and Android jobs with an aggregate gate, shared pinned toolchain setup, Gradle wrapper validation/read-only PR caches, and retained package/API/APK/AAR/lint artifacts. Keep tests compile-only.
+- Upgrade the pinned compiler archive to `0.10.18+6c83a7f62` and `moon` CLI to `0.1.20261028`; CI keeps the exact compiler assertion in `.github/actions/setup-moonbit`. Source, public interfaces and generated `.mbti` files need no changes, and `moon check --target native` reports no warnings.
+- Drop the argument-less `moon install` from the CI setup action: in this CLI it installs global binary packages and errors without a `<SOURCE>`. `moon update` still primes the registry index, and module dependencies resolve during `moon check`, `moon build` and `moon package`; because `moon package --list --frozen` cannot sync them itself, the published-file gate now runs after the native check.
+- Remove the closed `BUGFIX_PLAN.md`: its per-item outcomes remain in the `0.2.5`/`0.2.6` changelog entries and its remaining limits in ADR 0001/0002, so `docs/` keeps only ADRs.
+- Align the checked-JVM fixture dependencies with ajni `0.3.3`.
+- JNI APIs, Android/OHOS platform contracts and runtime behavior are unchanged.
+- `0.3.2` reached Mooncakes only: its tag predates the CI repair, so `v0.3.3` is the first GitHub Release after `v0.3.1`.
+
+## 0.3.2
+
+- Upgrade the pinned compiler archive to `0.10.17+d971670cd` and `moon` CLI to `0.1.20261023`; retain both pins in source packages and use the exact compiler assertion in CI. JNI APIs and Android/OHOS platform contracts are unchanged.
+- Retain Android and WebView's shared native-stub dependencies with package-local unused-import exemptions; no dummy managed calls or runtime API changes are needed.
+- Update the optional JVM invocation dependency to `Nanaloveyuki/dynlib@0.2.2` and align the checked-JVM fixture dependencies with ajni `0.3.2`.
+- Add an isolated, unpublished Harmony NAPI validation fixture with MoonBit C embedding, a Stage host, bounded owner-thread callbacks, and repeatable DevEco/HDC runners. API26 x86_64 emulator validation covers 13 runtime scenarios and Worker-owner termination cleanup; arm64 is build-only, independent OpenHarmony runtime and ArkWeb remain unverified. Published JNI APIs are unchanged.
+
+## 0.3.1
+
+- Preserve `.moonignore` in source archives so registry repackaging retains the `.moon-version` required by Android build scripts; enforce both files in publication checks.
+- Resolve dependencies when publishing extracted release archives. The pinned publisher validates another fresh extraction, where `--frozen` prevents installing the required `dynlib` dependency.
+- No runtime API or behavior changes from 0.3.0.
+
+## 0.3.0
+
+- Major feature release: ajni now supplies a general bidirectional JNI runtime, not only declarations and an Android event bridge. Hosts must initialize the matching MoonBit runtime and establish the owner-thread session explicitly; arbitrary foreign-thread MoonBit entry is unsupported. The pinned toolchain requires `0.x.y` package versions, so this release is `0.3.0`, not `1.0.0`; no additional platform/ABI support is implied.
+- Split reusable CI into MoonBit and Android jobs with an aggregate gate, shared pinned toolchain setup, Gradle wrapper validation/read-only PR caches, and retained package/API/APK/AAR/lint artifacts. Keep MoonBit unit tests compile-only; execute the checked-JVM integration fixture.
 - Add stable-tag release metadata/main-ancestry gates and validated GitHub Releases with source/Android integration ZIPs and SHA-256 checksums; scope weekly dependency updates to GitHub Actions.
 - Add opt-in Mooncakes delivery of the validated source artifact using isolated step credentials, owner-supplied credential JSON, restrictive file permissions and unconditional cleanup.
+- Fix CI installation to select archive `0.10.14+7d59c7ec9`, not the `moon` CLI ID `0.1.20260920` that returns HTTP 403; verify the exact compiler alongside the CLI pin without upgrading either.
+- Request only `platform-tools` from Android SDK setup instead of its obsolete default `tools` package; keep the project's SDK/NDK/CMake versions unchanged.
+- Implement checked bidirectional JNI in `runtime`: owner-thread sessions, global-reference handles, methods/constructors/fields, exact UTF-16 strings, primitive/object arrays, preserved Throwables and fixed Java callback dispatch with deferred cross-thread close.
+- Add explicit raw `unsafe` host/native-registration APIs and optional `invocation` backed by `dynlib` 0.2.1; keep JVM creation once-only and its loader alive without `DestroyJavaVM` or prelinked `libjvm`.
+- Migrate Android VM/env leases, exception and text helpers to the shared core; initialize MoonBit on explicit main-thread host initialization instead of `JNI_OnLoad`, and preserve generic sessions across feature shutdown.
+- Add repeatable real JDK21 checked-JNI fixtures for Java/native hosting and CI execution. Validate nested-error isolation, callback lifetime, stale generations, Unicode, fields/arrays, Throwable identity and loader/create failures; add Android callback instrumentation and companion keep rules.
+- Pin declaring/receiver/argument JNI references across synchronous reentry, resolve member reference types through the declaring class's loader, and reject non-Throwable `JavaThrown` payloads before JNI `Throw`; retain checked-JVM regressions.
+- Read the release version directly from MoonBit's manifest syntax instead of parsing dependency import blocks as TOML; keep stable-version, exact-tag and nonempty-changelog gates.
+- Verified locally: both checked-JVM host modes, native check/build-only tests, both-ABI Android JNI contract, debug APK/instrumentation compilation and lint; API37 x86_64 emulator passed all 8 instrumentation tests including actual Activity recreation, callback state/lifetime, handled observer errors and WebView paths. arm64/API24 runtime and R8 lookup remain unverified.
 
 ## 0.2.6
 

@@ -66,7 +66,7 @@ test "correlated callbacks drop either malformed side and preserve BOM" {
 
 ///|
 test "handler mutation preserves current snapshot and refreshes nested dispatch" {
-  let visits : Map[(Int, Int64), Int] = Map([])
+  let visits : Map[(Int32, Int64), Int32] = Map([])
   let b = Ref(0)
   let c = Ref(0)
   let a = @webview.install_event_handler(fn(event) {

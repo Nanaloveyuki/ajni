@@ -1,0 +1,7 @@
+{
+  "string": [
+    { "name": "module_desc", "value": "AJNI native runtime validation" },
+    { "name": "EntryAbility_desc", "value": "AJNI validation ability" },
+    { "name": "EntryAbility_label", "value": "AJNI OHOS MVP" }
+  ]
+}

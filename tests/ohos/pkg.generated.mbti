@@ -1,0 +1,23 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Nanaloveyuki/ajni-ohos-mvp"
+
+// Values
+pub fn entries() -> Int32
+
+pub fn reset() -> Unit
+
+pub fn round_trip(HostContext, Int32, String, Bytes, FuncRef[(HostContext, Int32, String, Bytes) -> Int32]) -> Int32
+
+pub fn total() -> Int32
+
+pub fn worker(Int32) -> Int32
+
+// Errors
+type ProbeError
+
+// Types and methods
+type HostContext
+
+// Type aliases
+
+// Traits

@@ -32,8 +32,11 @@ jobs:
           persist-credentials: false
       - name: Setup pinned MoonBit
         uses: ./.github/actions/setup-moonbit
-      - name: Check published file list
-        run: python3 scripts/check-package-files.py
+      - name: Setup JDK for checked JNI smoke
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
       - name: Check formatting and exported interfaces
         run: |
           moon fmt --check
@@ -43,6 +46,10 @@ jobs:
         run: |
           moon check --target native
           moon test --target native --build-only
+      - name: Check published file list
+        run: python3 scripts/check-package-files.py
+      - name: Exercise Java-hosted and native-hosted JNI
+        run: python3 scripts/run-jvm-smoke.py
       - name: Package module and generate API documentation
         run: |
           moon package --frozen
@@ -73,12 +80,14 @@ jobs:
       - name: Setup pinned MoonBit
         uses: ./.github/actions/setup-moonbit
       - name: Setup JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
       - name: Install pinned Android native build tools
         run: sdkmanager "platforms;android-35" "build-tools;36.1.0" "cmake;4.1.2" "ndk;29.0.14206865"
       - name: Setup Gradle and validate wrapper

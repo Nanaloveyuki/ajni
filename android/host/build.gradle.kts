@@ -15,6 +15,8 @@ android {
     consumerProguardFiles("consumer-rules.pro")
   }
 
+  sourceSets.getByName("main").java.srcDir("../../java/src/main/java")
+
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17

@@ -1,5 +1,5 @@
 ///|
-fn positive_mod(value : Int, modulus : Int) -> Int {
+fn positive_mod(value : Int32, modulus : Int32) -> Int32 {
   let remainder = value % modulus
   if remainder < 0 {
     remainder + modulus
@@ -9,7 +9,7 @@ fn positive_mod(value : Int, modulus : Int) -> Int {
 }
 
 ///|
-fn generated_class_name(raw : Array[Int]) -> String {
+fn generated_class_name(raw : Array[Int32]) -> String {
   let alphabet : ReadOnlyArray[Char] = [
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
     'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F',
@@ -28,7 +28,7 @@ fn generated_class_name(raw : Array[Int]) -> String {
 }
 
 ///|
-fn generated_native_name(raw : Array[Int]) -> String {
+fn generated_native_name(raw : Array[Int32]) -> String {
   let alphabet : ReadOnlyArray[Char] = [
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
     'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F',
@@ -44,7 +44,7 @@ fn generated_native_name(raw : Array[Int]) -> String {
 }
 
 ///|
-fn generated_type(raw : (Int, Int, Int)) -> (@ajni.JniType, String) {
+fn generated_type(raw : (Int32, Int32, Int32)) -> (@ajni.JniType, String) {
   let class_name = generated_class_name([raw.1])
   let (base, descriptor) = match positive_mod(raw.0, 9) {
     0 => (@ajni.JniType::boolean(), "Z")
@@ -71,7 +71,7 @@ fn generated_type(raw : (Int, Int, Int)) -> (@ajni.JniType, String) {
 }
 
 ///|
-fn invalid_class_name(raw : (Array[Int], Int)) -> String {
+fn invalid_class_name(raw : (Array[Int32], Int32)) -> String {
   let base = generated_class_name(raw.0)
   match positive_mod(raw.1, 6) {
     0 => "/" + base
@@ -84,7 +84,7 @@ fn invalid_class_name(raw : (Array[Int], Int)) -> String {
 }
 
 ///|
-fn invalid_native_name(raw : (Array[Int], Int)) -> String {
+fn invalid_native_name(raw : (Array[Int32], Int32)) -> String {
   let base = generated_native_name(raw.0)
   match positive_mod(raw.1, 6) {
     0 => "/" + base
@@ -97,7 +97,7 @@ fn invalid_native_name(raw : (Array[Int], Int)) -> String {
 }
 
 ///|
-fn array_depth_case(depth : Int) -> (Bool, String) {
+fn array_depth_case(depth : Int32) -> (Bool, String) {
   let mut value = @ajni.JniType::int()
   let mut expected = "I"
   for _ in 0..<depth {
@@ -115,7 +115,7 @@ fn array_depth_case(depth : Int) -> (Bool, String) {
 }
 
 ///|
-fn slot_case(raw : Array[Int]) -> (Int, Bool, String, String) {
+fn slot_case(raw : Array[Int32]) -> (Int32, Bool, String, String) {
   let parameters : Array[@ajni.JniType] = []
   let mut slots = 0
   let mut parameter_descriptor = ""
@@ -140,7 +140,9 @@ fn slot_case(raw : Array[Int]) -> (Int, Bool, String, String) {
 }
 
 ///|
-fn method_descriptor_context(input : (Array[(Int, Int, Int)], Int)) -> String {
+fn method_descriptor_context(
+  input : (Array[(Int32, Int32, Int32)], Int32),
+) -> String {
   let parameter_values : Array[@ajni.JniType] = []
   let mut parameter_descriptor = ""
   for raw in input.0 {
@@ -170,7 +172,7 @@ fn method_descriptor_context(input : (Array[(Int, Int, Int)], Int)) -> String {
 ///|
 test "quickcheck: class descriptors preserve generated valid names" {
   @quickcheck.check(
-    (raw : Array[Int]) => {
+    (raw : Array[Int32]) => {
       let name = generated_class_name(raw)
       let class = try! @ajni.JniClass::parse(name)
       class.internal_name() == name && class.descriptor() == "L" + name + ";"
@@ -185,7 +187,7 @@ test "quickcheck: class descriptors preserve generated valid names" {
 ///|
 test "quickcheck: method descriptors match an independent type oracle" {
   @quickcheck.check(
-    (input : (Array[(Int, Int, Int)], Int)) => {
+    (input : (Array[(Int32, Int32, Int32)], Int32)) => {
       let parameter_values : Array[@ajni.JniType] = []
       let mut parameter_descriptor = ""
       for raw in input.0 {
@@ -217,7 +219,7 @@ test "quickcheck: method descriptors match an independent type oracle" {
 ///|
 test "quickcheck: native declarations preserve valid names and signatures" {
   @quickcheck.check(
-    (raw : Array[Int]) => {
+    (raw : Array[Int32]) => {
       let name = generated_native_name(raw)
       let signature = try! @ajni.JniMethod::new([])
       let declaration = try! @ajni.NativeMethod::new(name, signature)
@@ -233,7 +235,7 @@ test "quickcheck: native declarations preserve valid names and signatures" {
 ///|
 test "quickcheck: invalid class names are rejected" {
   @quickcheck.check(
-    (raw : (Array[Int], Int)) => {
+    (raw : (Array[Int32], Int32)) => {
       try @ajni.JniClass::parse(invalid_class_name(raw)) catch {
         InvalidClassName(_) => true
         _ => false
@@ -251,7 +253,7 @@ test "quickcheck: invalid class names are rejected" {
 ///|
 test "quickcheck: invalid native names are rejected" {
   @quickcheck.check(
-    (raw : (Array[Int], Int)) => {
+    (raw : (Array[Int32], Int32)) => {
       let signature = try! @ajni.JniMethod::new([])
       try @ajni.NativeMethod::new(invalid_native_name(raw), signature) catch {
         InvalidNativeMethodName(_) => true
@@ -270,7 +272,7 @@ test "quickcheck: invalid native names are rejected" {
 ///|
 test "quickcheck: array dimensions stop at the JVM limit" {
   @quickcheck.check(
-    (raw : Int) => {
+    (raw : Int32) => {
       let depth = positive_mod(raw, 257)
       let (accepted, descriptor) = array_depth_case(depth)
       let expected_acceptance = depth <= 255
@@ -287,7 +289,7 @@ test "quickcheck: array dimensions stop at the JVM limit" {
 ///|
 test "quickcheck: method parameter slots reject only over-limit inputs" {
   @quickcheck.check(
-    (raw : Array[Int]) => {
+    (raw : Array[Int32]) => {
       let (slots, accepted, actual, expected) = slot_case(raw)
       accepted == (slots <= 255) && (!accepted || actual == expected)
     },
@@ -326,10 +328,10 @@ test "quickcheck: arbitrary byte input is normalized to stable UTF-8" {
 ///|
 test "quickcheck: aggregate descriptor limits use weighted MUTF-8 bytes" {
   @quickcheck.check(
-    (raw : (Int, Int, Int)) => {
+    (raw : (Int32, Int32, Int32)) => {
       // The oracle uses fixed per-scalar weights, independently of the
       // implementation's UTF-16 code-unit scan and cached type lengths.
-      let weighted_character : (Char, Int) = match positive_mod(raw.0, 4) {
+      let weighted_character : (Char, Int32) = match positive_mod(raw.0, 4) {
         0 => ('a', 1)
         1 => ('é', 2)
         2 => ('中', 3)

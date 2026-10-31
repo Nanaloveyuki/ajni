@@ -1,5 +1,5 @@
 ///|
-fn android_positive_mod(value : Int, modulus : Int) -> Int {
+fn android_positive_mod(value : Int32, modulus : Int32) -> Int32 {
   let remainder = value % modulus
   if remainder < 0 {
     remainder + modulus
@@ -10,8 +10,8 @@ fn android_positive_mod(value : Int, modulus : Int) -> Int {
 
 ///|
 fn expected_android_event(
-  input : (Int, Int, Int),
-) -> (Int, @android.AndroidEvent) {
+  input : (Int32, Int32, Int32),
+) -> (Int32, @android.AndroidEvent) {
   match android_positive_mod(input.0, 11) {
     0 => (1, Lifecycle(Created))
     1 => (2, Lifecycle(Started))
@@ -30,7 +30,7 @@ fn expected_android_event(
 ///|
 test "quickcheck: Android event codes map to the documented event model" {
   @quickcheck.check(
-    (input : (Int, Int, Int)) => {
+    (input : (Int32, Int32, Int32)) => {
       let (kind, expected) = expected_android_event(input)
       let events : Array[@android.AndroidEvent] = []
       let id = @android.install_event_handler(fn(event) { events.push(event) })
@@ -48,7 +48,7 @@ test "quickcheck: Android event codes map to the documented event model" {
 ///|
 test "quickcheck: unknown Android event codes are ignored" {
   @quickcheck.check(
-    (input : (Int, Int, Int)) => {
+    (input : (Int32, Int32, Int32)) => {
       let events : Array[@android.AndroidEvent] = []
       let id = @android.install_event_handler(fn(event) { events.push(event) })
       @android.dispatch_from_android(

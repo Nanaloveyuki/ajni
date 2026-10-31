@@ -2,27 +2,30 @@
 
 ## Scope
 
-`ajni` is an Android JNI runtime, not a window toolkit or application
-framework. Keep JNI ownership, Kotlin host behavior, and MoonBit public API
-explicit. The root `Nanaloveyuki/ajni` package must remain usable without
-linking the optional `Nanaloveyuki/ajni/webview` native stub.
+`ajni` is a JNI runtime whose core target is a checked, bidirectional Java↔MoonBit call path. Android host integration remains a first consumer; WebView is optional and must not shape the core interface. Keep JNI ownership, Kotlin host behavior, and MoonBit public API explicit.
 
-Discuss changes that alter JNI class names, Kotlin/native method signatures,
-public MoonBit APIs, Android API levels, or the feature split before starting
-implementation. Focused fixes, tests, and documentation improvements can be
-proposed directly.
+The root `Nanaloveyuki/ajni` package must remain usable without linking the optional `Nanaloveyuki/ajni/webview` native stub. General JNI runtime work follows [ADR 0001](docs/adr/0001-general-jni.md): the core owns session, handle, method/field, exception, and callback contracts; desktop JVM invocation and Android host adapters stay separate.
 
-Until MoonBit 1.0 is officially released, work is limited to bug fixes in
-existing behavior, build correctness, and documentation. Do not add general
-JNI APIs, binding generators, new platform/ABI support, or additional WebView
-features. Use [BUGFIX_PLAN.md](BUGFIX_PLAN.md) to track defect evidence and
-static acceptance criteria; reconsider feature expansion after 1.0.
+Discuss changes that alter JNI class names, Kotlin/native method signatures, public MoonBit APIs, Android API levels, or the feature split before starting implementation. Focused fixes, tests, and documentation improvements can be proposed directly.
+
+Before MoonBit 1.0, preserve the existing behavior while the general JNI seam is designed and implemented incrementally. Do not add binding generators, new platform/ABI support, or additional WebView features as part of this work. Use the ADR records for the runtime surface and `CHANGELOG.md` for historical defect evidence.
 
 ## Development Setup
 
-Install the MoonBit version in `.moon-version` and Java 17. Android build work
-additionally needs Android SDK platform 35, platform tools, NDK `29.0.14206865`,
-CMake `4.1.2`, and the bundled Gradle `8.10.2` wrapper.
+Install toolchain archive `0.10.18+6c83a7f62`, recorded in `.moonbit-toolchain`, JDK 21 for JVM smoke and Java 17 for Android builds.
+Its `moon` CLI version is `0.1.20261028`, recorded in `.moon-version`; archive IDs are compiler versions,
+not CLI versions. For Linux/macOS, pass the contents of `.moonbit-toolchain` to the official
+installer. On Windows, set `MOONBIT_INSTALL_VERSION` to the same archive ID before running
+the official PowerShell installer. Run `moon update` once to fetch the registry index; module
+dependencies then resolve during `moon check` or `moon build`, because `moon install` only
+installs global binary packages and requires an explicit `<SOURCE>`. `moon package --list
+--frozen` inspects the already-synced module directory and cannot fetch anything itself, so
+run it after a check or build.
+
+The root pins also apply to `tests/jvm`, `tests/invocation`, and the unpublished `tests/ohos`
+module. Android build work additionally needs Android SDK platform 35,
+platform tools, NDK `29.0.14206865`, CMake `4.1.2`, and the bundled Gradle
+`8.10.2` wrapper.
 
 Set `ANDROID_NDK_HOME` when the NDK is not discoverable through Android Studio:
 
@@ -35,8 +38,9 @@ output, or generated APKs.
 
 ## Package Boundaries
 
-- `src/` is the core JNI runtime. Do not add browser commands or browser event
-  types here.
+- `src/` is the descriptor/text package; `src/runtime/` owns generic JNI resources
+  and calls. `src/unsafe/` exposes raw host integration; `src/invocation/` alone
+  imports dynlib. Do not add browser commands or event types to these packages.
 - `src/webview/` owns the optional WebView MoonBit API and
   `ajni_webview_bridge.c` native stub.
 - `android/host/` contains the stable Kotlin JNI host class
@@ -49,8 +53,7 @@ the core-only build path.
 
 ## Validate Changes
 
-The current validation scope is static checking; Android/WebView runtime tests
-are deferred. Run:
+Run native static checks and build-only existing unit tests:
 
 ```powershell
 moon fmt --check
@@ -87,18 +90,27 @@ R8-minified lookup. Checker smoke may mutate temporary copies/captured javap,
 never production source. Package checks use `moon package --list --frozen` after
 dependency installation, consume both output streams, and fail on missing inputs.
 
-Android/WebView device/emulator/runtime scenarios remain deferred. Real Java JNI
-checks may run separately when authorized, with JVM version, actual C paths and
-fixture limitations recorded; they do not validate production Kotlin or ART.
-Compile MoonBit and instrumentation tests without executing them. Non-Android
-operations report unsupported failures, not simulated ART/WebView success.
-GitHub Actions compiles both ABIs/test sources and runs static lint without devices.
+Run `moon update` then `python3 scripts/run-jvm-smoke.py` on Linux with JDK21
+and a C compiler. Its isolated workspace exercises Java/native hosting against
+the real checked JVM, including typed calls, callbacks, lifetime and failures.
+This is distinct from Kotlin/ART evidence. CI executes this fixture, while
+Android CI compiles both ABIs/instrumentation and runs static lint without devices.
+When a device/emulator is available, run instrumentation and record its API/ABI
+and actual results separately. A build or Kotlin-only observer is not JNI proof.
+Non-Android feature operations report unsupported, never simulated platform success.
 
 Keep observer mutation/main-thread contracts and snapshot reentrancy intact;
 subscriptions survive ordinary shutdown. Instrumentation cleanup must clear the
 observer, shut down, and reverse-detach tracked containers even after failures.
 The Kotlin observer fires before JNI and is not end-to-end MoonBit evidence.
-Current exercised checks and deferred scenarios are recorded in `BUGFIX_PLAN.md`.
+Current exercised checks and deferred scenarios are recorded in ADR 0001 for
+JNI/Android and ADR 0002 for the Harmony fixture.
+
+For the isolated Harmony NAPI fixture, run `python3 scripts/build-ohos-mvp.py --host-smoke`
+with the installed DevEco SDK, then `python3 scripts/run-ohos-mvp.py --hap <hap>`
+against one connected HDC target. Generated C and matching MoonBit runtime sources
+are staged outside the repository. Keep SDK family/API/ABI build evidence separate
+from emulator/device results; see [ADR 0002](docs/adr/0002-harmony-validation.md).
 
 Update `README.md`, package `README.mbt.md` files, generated public interfaces,
 and tests whenever observable behavior changes. Do not commit `_build`,
@@ -116,7 +128,10 @@ and tests whenever observable behavior changes. Do not commit `_build`,
 
 ## CI Infrastructure
 
-`.github/actions/setup-moonbit` installs and verifies `.moon-version` on Linux.
+`.github/actions/setup-moonbit` installs the `.moonbit-toolchain` compiler archive on Linux,
+verifies both the `.moon-version` CLI pin and exact compiler version, and primes the
+registry index with `moon update`. Module dependencies resolve during `moon check`, so
+the setup does not call `moon install`; that command only installs global binaries.
 `Build` separates MoonBit/package checks from Android JNI/lint/build checks;
 the always-running `ci` job fails if either job fails, is cancelled, or is skipped.
 Configure branch protection to require `ci` (replacing the former `checks` job)
@@ -171,9 +186,12 @@ same validated source ZIP to Mooncakes after GitHub Release creation:
    Actions variable `MOONCAKES_PUBLISH` to `true` to enable the job. The JSON shape
    is `{"token":"...","username":"..."}`; `username` is optional.
 3. The release job writes credentials with mode `0600` only for publishing,
-   extracts the validated source artifact, runs `moon publish --frozen`, and
-   removes credentials on exit and in an always-running cleanup step. It does
-   not expose the secret to pull requests or cache/upload MoonBit home.
+   extracts the validated source artifact, resolves dependencies with `moon check`,
+   validates its publication file list, then runs `moon publish`. The pinned
+   publisher rechecks a fresh extraction, so `--frozen` cannot sync its dependencies.
+   `.moonignore` must ship with the archive to preserve both toolchain pins on repack.
+   Credentials are removed on exit and in an always-running cleanup step; no
+   secret is exposed to pull requests or cached/uploaded with MoonBit home.
 
 Configure without printing the credential (replace the path when `MOON_HOME`
 differs from the default):

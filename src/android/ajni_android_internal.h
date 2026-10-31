@@ -21,22 +21,23 @@ int32_t ajni_error_status(void);
 #include <stddef.h>
 #include <stdbool.h>
 #include <jni.h>
+#include "../runtime/ajni_runtime.h"
 
-extern JavaVM *g_vm;
 extern jclass g_bridge_class;
 
 typedef struct {
-  JavaVM *vm;
+  AjniEnvLease core;
   JNIEnv *env;
   jclass bridge_class;
-  bool attached;
   int64_t runtime_generation;
 } AjniBridgeLease;
 
 bool ajni_check_exception(JNIEnv *env, const char *operation);
-void ajni_throw_new(JNIEnv *env, const char *class_name, const char *message);
-jstring ajni_string_from_utf8(JNIEnv *env, const char *text, size_t length);
-char *ajni_utf8_from_string(JNIEnv *env, jstring text, size_t *out_length);
+#define ajni_throw_new ajni_rt_throw_new
+#define ajni_string_from_utf8 ajni_rt_string_from_utf8
+#define ajni_utf8_from_string ajni_rt_utf8_from_string
+bool ajni_android_enter(JNIEnv *env);
+void ajni_android_leave(JNIEnv *env);
 int32_t ajni_bridge_lease_acquire(AjniBridgeLease *lease);
 void ajni_bridge_lease_release(AjniBridgeLease *lease);
 bool ajni_register_webview_natives(JNIEnv *env, jclass bridge_class);

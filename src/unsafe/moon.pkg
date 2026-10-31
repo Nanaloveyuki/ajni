@@ -1,0 +1,8 @@
+import {
+  "Nanaloveyuki/ajni/runtime",
+}
+
+options(
+  "native-stub": [ "ajni_unsafe.c" ],
+  targets: { "ffi.mbt": [ "native" ], "host.mbt": [ "native" ] },
+)

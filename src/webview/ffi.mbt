@@ -1,20 +1,20 @@
 ///|
 #borrow(payload, request_id)
 extern "C" fn native_command(
-  command : Int,
+  command : Int32,
   handle : Int64,
   payload : Bytes,
   request_id : Bytes,
-) -> Int = "ajni_webview_command"
+) -> Int32 = "ajni_webview_command"
 
 ///|
 extern "C" fn native_set_bounds(
   handle : Int64,
-  x : Int,
-  y : Int,
-  width : Int,
-  height : Int,
-) -> Int = "ajni_webview_set_bounds"
+  x : Int32,
+  y : Int32,
+  width : Int32,
+  height : Int32,
+) -> Int32 = "ajni_webview_set_bounds"
 
 ///|
 extern "C" fn native_last_error() -> Bytes = "ajni_last_error"

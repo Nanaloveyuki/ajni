@@ -1,0 +1,10 @@
+import {
+  "Nanaloveyuki/ajni/runtime",
+  "Nanaloveyuki/dynlib",
+  "moonbitlang/core/encoding/utf8",
+}
+
+options(
+  "native-stub": [ "ajni_invocation.c" ],
+  targets: { "ffi.mbt": [ "native" ], "invocation.mbt": [ "native" ] },
+)
