@@ -69,8 +69,10 @@ jobs:
           The MoonBit source ZIP is the package produced by the pinned toolchain.
           The Android ZIP contains a debug demo APK, an instrumentation APK and the
           reusable host AAR; these are integration artifacts, not production-signed apps.
-          Native checks, compile-only tests, real NDK JNI checks and Android lint/builds
-          passed. Android/WebView device runtime validation remains deferred.
+          Native checks, compile-only unit tests, real checked-JVM integration fixtures,
+          real NDK JNI checks and Android lint/builds passed in CI. CI does not execute
+          Android devices; locally exercised API/ABI scenarios and remaining limits are
+          recorded separately in the version's changelog and ADR.
           NOTES
           mkdir -p release/assets
           cp release/package/*.zip release/assets/
@@ -128,7 +130,9 @@ jobs:
           source_dir="$(mktemp -d "$RUNNER_TEMP/ajni-publish.XXXXXX")"
           unzip -q "$RUNNER_TEMP"/ajni-package/*.zip -d "$source_dir"
           cd "$source_dir"
-          moon publish --frozen
+          moon check --target native
+          python3 scripts/check-package-files.py
+          moon publish
       - name: Remove registry credentials
         if: always()
         run: rm -f "$MOON_HOME/credentials.json"

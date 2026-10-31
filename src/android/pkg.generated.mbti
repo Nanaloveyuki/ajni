@@ -7,15 +7,15 @@ import {
 }
 
 // Values
-pub fn dispatch_from_android(Int, Int, Int) -> Unit
+pub fn dispatch_from_android(Int32, Int32, Int32) -> Unit
 
-pub fn emit_for_test(Int, Int, Int) -> Unit
+pub fn emit_for_test(Int32, Int32, Int32) -> Unit
 
-pub fn install_event_handler((AndroidEvent) -> Unit) -> Int
+pub fn install_event_handler((AndroidEvent) -> Unit) -> Int32
 
 pub fn post_to_ui() -> Unit raise @ajni.JniError
 
-pub fn remove_event_handler(Int) -> Unit
+pub fn remove_event_handler(Int32) -> Unit
 
 pub fn runtime_ready() -> Bool
 
@@ -26,8 +26,8 @@ pub fn start_worker() -> Unit raise @ajni.JniError
 // Types and methods
 pub(all) enum AndroidEvent {
   Lifecycle(Lifecycle)
-  SurfaceCreated(Int, Int)
-  SurfaceChanged(Int, Int)
+  SurfaceCreated(Int32, Int32)
+  SurfaceChanged(Int32, Int32)
   SurfaceDestroyed
   WorkerAttached
   UiTask

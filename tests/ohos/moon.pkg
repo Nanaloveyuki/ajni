@@ -1,0 +1,15 @@
+pkgtype(kind: "executable")
+
+options(
+  link: {
+    "native": {
+      "exports": [
+        "reset:ajni_ohos_reset",
+        "total:ajni_ohos_total",
+        "entries:ajni_ohos_entries",
+        "worker:ajni_ohos_worker",
+        "round_trip:ajni_ohos_round_trip",
+      ],
+    },
+  },
+)

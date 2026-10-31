@@ -70,7 +70,7 @@ test "descriptor limits reject oversized JVM shapes" {
 
 ///|
 test "class names reserve object descriptor bytes at MUTF-8 boundaries" {
-  let cases : Array[(Char, Int, String)] = [
+  let cases : Array[(Char, Int32, String)] = [
     ('a', 65533, ""),
     ('é', 32766, "a"),
     ('中', 21844, "a"),
@@ -107,7 +107,7 @@ test "class names reserve object descriptor bytes at MUTF-8 boundaries" {
 ///|
 test "native method names use the full MUTF-8 name byte limit" {
   let signature = try! @ajni.JniMethod::new([])
-  let cases : Array[(Char, Int, String)] = [
+  let cases : Array[(Char, Int32, String)] = [
     ('a', 65535, ""),
     ('é', 32767, "a"),
     ('中', 21845, ""),
@@ -134,7 +134,7 @@ test "native method names use the full MUTF-8 name byte limit" {
 
 ///|
 test "method descriptors count encoding bytes including their framing" {
-  let cases : Array[(Char, Int, String)] = [
+  let cases : Array[(Char, Int32, String)] = [
     ('a', 65530, ""),
     ('é', 32765, ""),
     ('中', 21843, "a"),

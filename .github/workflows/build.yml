@@ -32,8 +32,11 @@ jobs:
           persist-credentials: false
       - name: Setup pinned MoonBit
         uses: ./.github/actions/setup-moonbit
-      - name: Check published file list
-        run: python3 scripts/check-package-files.py
+      - name: Setup JDK for checked JNI smoke
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
       - name: Check formatting and exported interfaces
         run: |
           moon fmt --check
@@ -43,6 +46,10 @@ jobs:
         run: |
           moon check --target native
           moon test --target native --build-only
+      - name: Check published file list
+        run: python3 scripts/check-package-files.py
+      - name: Exercise Java-hosted and native-hosted JNI
+        run: python3 scripts/run-jvm-smoke.py
       - name: Package module and generate API documentation
         run: |
           moon package --frozen

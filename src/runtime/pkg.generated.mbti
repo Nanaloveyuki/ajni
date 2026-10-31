@@ -1,0 +1,112 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Nanaloveyuki/ajni/runtime"
+
+import {
+  "Nanaloveyuki/ajni",
+}
+
+// Values
+pub fn internal_check_status(Int32) -> Unit raise RuntimeError
+
+pub fn unsafe_export_local(JavaObject, UInt64) -> UInt64 raise RuntimeError
+
+pub fn unsafe_import_class(Session, UInt64, UInt64) -> JavaClass raise RuntimeError
+
+pub fn unsafe_import_object(Session, UInt64, UInt64, Bool) -> JavaObject raise RuntimeError
+
+pub fn unsafe_raw_env(Session) -> UInt64 raise RuntimeError
+
+pub fn unsafe_raw_vm(Session) -> UInt64 raise RuntimeError
+
+pub fn unsafe_register_native(JavaClass, String, String, UInt64) -> Unit raise RuntimeError
+
+// Errors
+pub(all) suberror RuntimeError {
+  UnsupportedTarget
+  NotInitialized
+  Closed
+  WrongThread
+  Busy
+  InvalidArgument(String)
+  JavaThrown(JavaObject)
+  NativeFailure(String)
+}
+
+// Types and methods
+pub struct JavaCallback {
+  object : JavaObject
+}
+pub fn JavaCallback::close(Self) -> Unit raise RuntimeError
+pub fn JavaCallback::object(Self) -> JavaObject
+
+pub struct JavaClass {
+  object : JavaObject
+}
+pub fn JavaClass::instance_field(Self, String, @ajni.JniType) -> JavaField raise RuntimeError
+pub fn JavaClass::instance_method(Self, String, @ajni.JniMethod) -> JavaMethod raise RuntimeError
+pub fn JavaClass::lookup_constructor(Self, ArrayView[@ajni.JniType]) -> JavaConstructor raise RuntimeError
+pub fn JavaClass::new_object_array(Self, Int32, initial? : JavaObject) -> JavaObject raise RuntimeError
+pub fn JavaClass::object(Self) -> JavaObject
+pub fn JavaClass::static_field(Self, String, @ajni.JniType) -> JavaField raise RuntimeError
+pub fn JavaClass::static_method(Self, String, @ajni.JniMethod) -> JavaMethod raise RuntimeError
+
+pub struct JavaConstructor {
+  native : NativeMember
+}
+pub fn JavaConstructor::new(Self, ArrayView[JavaValue]) -> JavaObject raise RuntimeError
+
+pub struct JavaField {
+  native : NativeMember
+}
+pub fn JavaField::get(Self, receiver? : JavaObject) -> JavaValue raise RuntimeError
+pub fn JavaField::set(Self, JavaValue, receiver? : JavaObject) -> Unit raise RuntimeError
+
+pub struct JavaMethod {
+  native : NativeMember
+}
+pub fn JavaMethod::call(Self, ArrayView[JavaValue], receiver? : JavaObject) -> JavaValue raise RuntimeError
+
+pub struct JavaObject {
+  native : NativeObject
+}
+pub fn JavaObject::array_length(Self) -> Int32 raise RuntimeError
+pub fn JavaObject::close(Self) -> Unit raise RuntimeError
+pub fn JavaObject::get_element(Self, Int32) -> JavaValue raise RuntimeError
+pub fn JavaObject::is_same(Self, Self) -> Bool raise RuntimeError
+pub fn JavaObject::read_region(Self, Int32, Int32) -> Array[JavaValue] raise RuntimeError
+pub fn JavaObject::set_element(Self, Int32, JavaValue) -> Unit raise RuntimeError
+pub fn JavaObject::to_string_value(Self) -> String raise RuntimeError
+pub fn JavaObject::write_region(Self, Int32, ArrayView[JavaValue]) -> Unit raise RuntimeError
+
+pub(all) enum JavaValue {
+  Void
+  Boolean(Bool)
+  Byte(Int32)
+  Char(Int32)
+  Short(Int32)
+  Int(Int32)
+  Long(Int64)
+  Float(Float)
+  Double(Double)
+  Object(JavaObject?)
+}
+
+type NativeMember
+
+type NativeObject
+
+type NativeSession
+
+pub struct Session {
+  native : NativeSession
+}
+pub fn Session::callback(Self, @ajni.JniMethod, (ArrayView[JavaValue]) -> JavaValue raise RuntimeError) -> JavaCallback raise RuntimeError
+pub fn Session::close(Self) -> Unit raise RuntimeError
+pub fn Session::current() -> Self raise RuntimeError
+pub fn Session::find_class(Self, @ajni.JniClass) -> JavaClass raise RuntimeError
+pub fn Session::new_primitive_array(Self, @ajni.JniType, Int32) -> JavaObject raise RuntimeError
+pub fn Session::new_string(Self, String) -> JavaObject raise RuntimeError
+
+// Type aliases
+
+// Traits

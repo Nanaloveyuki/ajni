@@ -18,7 +18,7 @@ typedef uint8_t *moonbit_bytes_t;
 
 
 #if defined(AJNI_USE_MOONBIT_EXPORTS)
-extern int32_t ajni_dispatch_webview_event(int32_t kind, int64_t handle,
+extern void ajni_dispatch_webview_event(int32_t kind, int64_t handle,
                                            moonbit_bytes_t payload,
                                            moonbit_bytes_t detail);
 #endif
@@ -55,8 +55,6 @@ static void ajni_emit_webview(JNIEnv *env, jint kind, jlong handle, jstring payl
     return;
   }
   ajni_dispatch_webview_event(kind, handle, payload_bytes, detail_bytes);
-  moonbit_decref(payload_bytes);
-  moonbit_decref(detail_bytes);
 #else
   (void)env;
   (void)kind;
@@ -69,7 +67,9 @@ static void ajni_emit_webview(JNIEnv *env, jint kind, jlong handle, jstring payl
 static void ajni_native_webview_event(JNIEnv *env, jclass unused, jint kind, jlong handle,
                                       jstring payload, jstring detail) {
   (void)unused;
+  if (!ajni_android_enter(env)) return;
   ajni_emit_webview(env, kind, handle, payload, detail);
+  ajni_android_leave(env);
 }
 
 bool ajni_register_webview_natives(JNIEnv *env, jclass bridge_class) {

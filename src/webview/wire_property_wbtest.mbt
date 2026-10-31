@@ -1,5 +1,5 @@
 ///|
-fn property_field_name(index : Int) -> String {
+fn property_field_name(index : Int32) -> String {
   let output : Array[Char] = ['f']
   for _ in 0..<(index + 1) {
     output.push('a')
@@ -34,7 +34,7 @@ fn fields_match(
 }
 
 ///|
-fn malformed_wire(input : (String, Int)) -> String {
+fn malformed_wire(input : (String, Int32)) -> String {
   let field = property_field_name(positive_mod(input.1, 8))
   let value = base64url(@ajni.encode_utf8(input.0))
   match positive_mod(input.1, 5) {
@@ -47,7 +47,7 @@ fn malformed_wire(input : (String, Int)) -> String {
 }
 
 ///|
-fn positive_mod(value : Int, modulus : Int) -> Int {
+fn positive_mod(value : Int32, modulus : Int32) -> Int32 {
   let remainder = value % modulus
   if remainder < 0 {
     remainder + modulus
@@ -89,7 +89,7 @@ test "quickcheck: field encoding round trips unique valid fields" {
 ///|
 test "quickcheck: malformed field wires are rejected" {
   @quickcheck.check(
-    (input : (String, Int)) => decode_fields(malformed_wire(input)) is None,
+    (input : (String, Int32)) => decode_fields(malformed_wire(input)) is None,
     count=500,
     max_size=128,
     max_shrinks=100,
@@ -123,7 +123,7 @@ test "quickcheck: structured page messages preserve arbitrary payloads" {
 ///|
 test "quickcheck: resource limits accept exactly non-negative values" {
   @quickcheck.check(
-    (input : (Int, Int, Int, Int)) => {
+    (input : (Int32, Int32, Int32, Int32)) => {
       let limits = WebViewResourceLimits::new(
         max_page_message_bytes=input.0,
         max_pending_asset_requests=input.1,

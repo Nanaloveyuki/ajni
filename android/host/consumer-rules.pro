@@ -10,8 +10,19 @@
     private static native void nativeOnUiTask(int);
     private static native void nativeStartWorker();
     private static native java.lang.String nativeEcho(java.lang.String);
+    private static native dev.nanaloveyuki.ajni.AjniCallback nativeCreateIntCallback();
+    private static native boolean nativeHandledObserverError();
     private static native void nativeWebViewEvent(int, long, java.lang.String, java.lang.String);
     private static boolean postUiCallbackForRuntime(int, long);
     private static boolean webViewCommandForRuntime(int, long, java.lang.String, java.lang.String, long);
     private static boolean webViewSetBoundsForRuntime(long, int, int, int, int, long);
+}
+
+-keep class dev.nanaloveyuki.ajni.AjniCallback {
+    public <init>(long);
+    private static native java.lang.Object dispatch(long, java.lang.Object[]);
+    private static native void close(long);
+}
+-keep class dev.nanaloveyuki.ajni.AjniException {
+    public <init>(java.lang.String);
 }
