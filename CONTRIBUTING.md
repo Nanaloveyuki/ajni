@@ -8,7 +8,7 @@ The root `Nanaloveyuki/ajni` package must remain usable without linking the opti
 
 Discuss changes that alter JNI class names, Kotlin/native method signatures, public MoonBit APIs, Android API levels, or the feature split before starting implementation. Focused fixes, tests, and documentation improvements can be proposed directly.
 
-Before MoonBit 1.0, preserve the existing behavior while the general JNI seam is designed and implemented incrementally. Do not add binding generators, new platform/ABI support, or additional WebView features as part of this work. Use [BUGFIX_PLAN.md](BUGFIX_PLAN.md) for existing defect evidence; use the ADR and implementation records for the new runtime surface.
+Before MoonBit 1.0, preserve the existing behavior while the general JNI seam is designed and implemented incrementally. Do not add binding generators, new platform/ABI support, or additional WebView features as part of this work. Use the ADR records for the runtime surface and `CHANGELOG.md` for historical defect evidence.
 
 ## Development Setup
 
@@ -18,7 +18,9 @@ not CLI versions. For Linux/macOS, pass the contents of `.moonbit-toolchain` to 
 installer. On Windows, set `MOONBIT_INSTALL_VERSION` to the same archive ID before running
 the official PowerShell installer. Run `moon update` once to fetch the registry index; module
 dependencies then resolve during `moon check` or `moon build`, because `moon install` only
-installs global binary packages and requires an explicit `<SOURCE>`.
+installs global binary packages and requires an explicit `<SOURCE>`. `moon package --list
+--frozen` inspects the already-synced module directory and cannot fetch anything itself, so
+run it after a check or build.
 
 The root pins also apply to `tests/jvm`, `tests/invocation`, and the unpublished `tests/ohos`
 module. Android build work additionally needs Android SDK platform 35,
@@ -101,7 +103,8 @@ Keep observer mutation/main-thread contracts and snapshot reentrancy intact;
 subscriptions survive ordinary shutdown. Instrumentation cleanup must clear the
 observer, shut down, and reverse-detach tracked containers even after failures.
 The Kotlin observer fires before JNI and is not end-to-end MoonBit evidence.
-Current exercised checks and deferred scenarios are recorded in `BUGFIX_PLAN.md`.
+Current exercised checks and deferred scenarios are recorded in ADR 0001 for
+JNI/Android and ADR 0002 for the Harmony fixture.
 
 For the isolated Harmony NAPI fixture, run `python3 scripts/build-ohos-mvp.py --host-smoke`
 with the installed DevEco SDK, then `python3 scripts/run-ohos-mvp.py --hap <hap>`

@@ -261,11 +261,11 @@ not a network sandbox for page subresources, redirects, or links.
 ## Maintenance Scope
 
 Existing behavior continues to receive bug fixes, build corrections, and
-documentation updates. General bidirectional JNI runtime work now follows
+documentation updates. General bidirectional JNI runtime work follows
 [ADR 0001](docs/adr/0001-general-jni.md); WebView remains an optional consumer
-and does not expand as part of the core closure.
-See [BUGFIX_PLAN.md](BUGFIX_PLAN.md) for existing defect evidence, status, and
-remaining validation limits.
+and does not expand as part of the core closure. ADR 0001 records the JNI and
+Android evidence with its remaining limits, ADR 0002 records the Harmony
+fixture boundary, and `CHANGELOG.md` carries the historical fix evidence.
 
 ## Build And Verify
 
