@@ -91,8 +91,10 @@ jobs:
       - name: Install pinned Android native build tools
         run: sdkmanager "platforms;android-35" "build-tools;36.1.0" "cmake;4.1.2" "ndk;29.0.14206865"
       - name: Setup Gradle and validate wrapper
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
+          # v6's default enhanced cache loads a proprietary component; keep CI MIT-only.
+          cache-provider: basic
           validate-wrappers: true
           cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
       - name: Verify pinned Gradle wrapper version
