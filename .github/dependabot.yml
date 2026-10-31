@@ -4,3 +4,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # v6 vendors a proprietary cache component, so major bumps need a manual
+      # license review before they reach CI.
+      - dependency-name: "gradle/actions"
+        update-types: ["version-update:semver-major"]
