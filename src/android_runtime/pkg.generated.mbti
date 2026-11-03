@@ -2,6 +2,10 @@
 package "Nanaloveyuki/ajni/android_runtime"
 
 // Values
+pub fn application_context_for_test(UInt64, Int32) -> UInt64
+
+pub fn context_package_name_for_test(UInt64) -> UInt64
+
 pub fn create_int_callback(UInt64) -> UInt64
 
 pub fn dispatch(Int32, Int32, Int32) -> Unit

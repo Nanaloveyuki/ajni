@@ -38,6 +38,14 @@ MOONBIT_FFI_EXPORT moonbit_bytes_t ajni_last_error(void) {
 }
 #endif
 
+MOONBIT_FFI_EXPORT int32_t ajni_android_supported(void) {
+#if defined(__ANDROID__)
+  return 1;
+#else
+  return 0;
+#endif
+}
+
 #if defined(__ANDROID__)
 #include <stdbool.h>
 #include <stddef.h>
@@ -50,6 +58,10 @@ typedef void (*ajni_event_callback)(void *, int32_t, int32_t, int32_t);
 extern void ajni_dispatch_event(int32_t kind, int32_t first, int32_t second);
 extern uint64_t ajni_create_int_callback(uint64_t env);
 extern int32_t ajni_handled_observer_error(void);
+#if defined(AJNI_CONTEXT_TEST_EXPORTS)
+extern uint64_t ajni_application_context_for_test(uint64_t env, int32_t stage);
+extern uint64_t ajni_context_package_name_for_test(uint64_t env);
+#endif
 extern void moonbit_runtime_init(int argc, char **argv);
 extern void moonbit_init(void);
 #endif
@@ -357,6 +369,41 @@ static jboolean ajni_native_handled_observer_error(JNIEnv *env, jclass unused) {
   return result;
 }
 
+static jobject ajni_native_application_context_for_testing(JNIEnv *env, jclass unused, jint stage) {
+  (void)unused;
+  if (!ajni_android_enter(env)) return NULL;
+#if defined(AJNI_CONTEXT_TEST_EXPORTS)
+  jobject result = (jobject)(uintptr_t)ajni_application_context_for_test((uint64_t)(uintptr_t)env, stage);
+#else
+  (void)stage;
+  jobject result = NULL;
+#endif
+  if (result == NULL && !(*env)->ExceptionCheck(env))
+    ajni_throw_new(env, "dev/nanaloveyuki/ajni/AjniException", "Context acceptance export is unavailable");
+  ajni_android_leave(env);
+  return result;
+}
+
+static jstring ajni_native_context_package_name_for_testing(JNIEnv *env, jclass unused) {
+  (void)unused;
+  if (!ajni_android_enter(env)) return NULL;
+#if defined(AJNI_CONTEXT_TEST_EXPORTS)
+  jstring result = (jstring)(uintptr_t)ajni_context_package_name_for_test((uint64_t)(uintptr_t)env);
+#else
+  jstring result = NULL;
+#endif
+  if (result == NULL && !(*env)->ExceptionCheck(env))
+    ajni_throw_new(env, "dev/nanaloveyuki/ajni/AjniException", "Context package-name export is unavailable");
+  ajni_android_leave(env);
+  return result;
+}
+
+static void ajni_native_context_close_session_for_testing(JNIEnv *env, jclass unused) {
+  (void)unused;
+  /* Close outside a managed entry; host_close itself checks the owner. */
+  if (ajni_rt_host_close(env) != AJNI_RT_OK) ajni_rt_host_throw(env);
+}
+
 static void ajni_native_initialize(JNIEnv *env, jclass unused, jobject context, jlong generation) {
   (void)unused;
   if ((*env)->ExceptionCheck(env)) return;
@@ -583,6 +630,9 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *unused) {
       {"nativeEcho", "(Ljava/lang/String;)Ljava/lang/String;", (void *)ajni_native_echo},
       {"nativeCreateIntCallback", "()Ldev/nanaloveyuki/ajni/AjniCallback;", (void *)ajni_native_create_int_callback},
       {"nativeHandledObserverError", "()Z", (void *)ajni_native_handled_observer_error},
+      {"nativeApplicationContextForTesting", "(I)Landroid/content/Context;", (void *)ajni_native_application_context_for_testing},
+      {"nativeContextPackageNameForTesting", "()Ljava/lang/String;", (void *)ajni_native_context_package_name_for_testing},
+      {"nativeContextCloseSessionForTesting", "()V", (void *)ajni_native_context_close_session_for_testing},
   };
   jint registration = (*env)->RegisterNatives(env, local_class, methods, sizeof(methods) / sizeof(methods[0]));
   if ((*env)->ExceptionCheck(env) || registration != JNI_OK) {

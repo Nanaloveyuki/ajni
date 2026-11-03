@@ -122,7 +122,7 @@ add_library(ajni SHARED
   ${MOONBIT_RUNTIME_SOURCES}
 )
 add_dependencies(ajni generate_moonbit_android_runtime)
-target_compile_definitions(ajni PRIVATE AJNI_USE_MOONBIT_EXPORTS=1 AJNI_FEATURE_WEBVIEW=1)
+target_compile_definitions(ajni PRIVATE AJNI_USE_MOONBIT_EXPORTS=1 AJNI_FEATURE_WEBVIEW=1 AJNI_CONTEXT_TEST_EXPORTS=1)
 target_include_directories(ajni PRIVATE "${MOON_HOME}/include")
 set_source_files_properties("${AJNI_BRIDGE_SOURCE}" PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")
 set_source_files_properties("${AJNI_WEBVIEW_BRIDGE_SOURCE}" PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")

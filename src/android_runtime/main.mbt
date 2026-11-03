@@ -26,6 +26,30 @@ pub fn handled_observer_error() -> Int32 {
 }
 
 ///|
+let context_before_init_rejected : Bool = try {
+  let context = @android.application_context()
+  context.close() catch {
+    _ => ()
+  }
+  false
+} catch {
+  @runtime.NotInitialized => true
+  _ => false
+}
+
+///|
+pub fn application_context_for_test(env : UInt64, stage : Int32) -> UInt64 {
+  @android.application_context_for_test(
+    env, stage, context_before_init_rejected,
+  )
+}
+
+///|
+pub fn context_package_name_for_test(env : UInt64) -> UInt64 {
+  @android.context_package_name_for_test(env)
+}
+
+///|
 fn main {
   ()
 }

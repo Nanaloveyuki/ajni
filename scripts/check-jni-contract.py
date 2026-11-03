@@ -50,6 +50,9 @@ NATIVES = (
     Native("nativeEcho", "(Ljava/lang/String;)Ljava/lang/String;", "ajni_native_echo", "core"),
     Native("nativeCreateIntCallback", "()Ldev/nanaloveyuki/ajni/AjniCallback;", "ajni_native_create_int_callback", "core"),
     Native("nativeHandledObserverError", "()Z", "ajni_native_handled_observer_error", "core"),
+    Native("nativeApplicationContextForTesting", "(I)Landroid/content/Context;", "ajni_native_application_context_for_testing", "core"),
+    Native("nativeContextPackageNameForTesting", "()Ljava/lang/String;", "ajni_native_context_package_name_for_testing", "core"),
+    Native("nativeContextCloseSessionForTesting", "()V", "ajni_native_context_close_session_for_testing", "core"),
     Native("nativeWebViewEvent", "(IJLjava/lang/String;Ljava/lang/String;)V", "ajni_native_webview_event", "webview"),
 )
 UPCALLS = {
@@ -57,8 +60,10 @@ UPCALLS = {
     "webViewCommandForRuntime": ("(IJLjava/lang/String;Ljava/lang/String;J)Z", "webview", "ajni_webview_command"),
     "webViewSetBoundsForRuntime": ("(JIIIIJ)Z", "webview", "ajni_webview_set_bounds"),
 }
+MANAGED_UPCALLS = {"applicationContextForRuntime": "()Landroid/content/Context;"}
 EXPECTED = {item.name: item.descriptor for item in NATIVES}
 EXPECTED.update({name: spec[0] for name, spec in UPCALLS.items()})
+EXPECTED.update(MANAGED_UPCALLS)
 COMPANION_RULES = {
     "dev.nanaloveyuki.ajni.AjniCallback": {
         "public <init>(long)",
@@ -176,7 +181,7 @@ def parse_javap(text):
 
 
 def check_bytecode(text):
-    """Validate all bridge natives and three private static boolean upcalls."""
+    """Validate bridge natives and private static native/managed upcalls."""
     methods = parse_javap(text)
     found = {}
     for name, descriptor in EXPECTED.items():
@@ -184,7 +189,7 @@ def check_bytecode(text):
         require(len(matches) == 1, f"bytecode: {name} must occur exactly once (found {len(matches)})")
         method = matches[0]
         required = {"private", "static"}
-        if name not in UPCALLS:
+        if name not in UPCALLS and name not in MANAGED_UPCALLS:
             required.add("native")
         require(method.modifiers in (frozenset(required), frozenset(required | {"final"})),
                 f"bytecode: {name} has wrong modifiers: {sorted(method.modifiers)}")
@@ -682,6 +687,7 @@ def compile_native_contract(stubs, compilers, moon_home):
     if not (include / "moonbit.h").is_file():
         raise PrerequisiteError(f"missing MoonBit C header: {include / 'moonbit.h'}")
     configurations = {"production": ["-DAJNI_USE_MOONBIT_EXPORTS=1", "-DAJNI_FEATURE_WEBVIEW=1"],
+                      "bundled acceptance": ["-DAJNI_USE_MOONBIT_EXPORTS=1", "-DAJNI_FEATURE_WEBVIEW=1", "-DAJNI_CONTEXT_TEST_EXPORTS=1"],
                       "callback (exports disabled)": ["-DAJNI_FEATURE_WEBVIEW=1"]}
     checked = []
     with tempfile.TemporaryDirectory(prefix="ajni-jni-contract-") as temporary:
@@ -749,7 +755,7 @@ def main(argv=None):
     except OSError as error:
         print("JNI contract input/tool access failed: " + str(error), file=sys.stderr)
         return 2
-    print("JNI static contract passed: 12 native methods, 3 boolean upcalls, exact bridge/companion keep members.")
+    print(f"JNI static contract passed: {len(NATIVES)} native methods, {len(UPCALLS)} boolean upcalls, {len(MANAGED_UPCALLS)} managed object upcall, exact bridge/companion keep members.")
     print("Bytecode: " + str(class_file))
     for abi, configuration in checked:
         print(f"Android API24 {abi}: {configuration}; real runtime/core/WebView definitions and _Generic prototypes (-Werror, syntax-only).")

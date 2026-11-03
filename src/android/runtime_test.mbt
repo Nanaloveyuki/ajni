@@ -51,3 +51,13 @@ test "handler mutation preserves current snapshot and refreshes nested dispatch"
     assert_eq(visits.get((3, phase)), Some(1))
   }
 }
+
+///|
+test "application Context rejects non-Android hosts before session lookup" {
+  try @android.application_context() catch {
+    @runtime.UnsupportedTarget => ()
+    _ => fail("Unexpected Context acquisition error")
+  } noraise {
+    _ => fail("Non-Android host acquired an application Context")
+  }
+}

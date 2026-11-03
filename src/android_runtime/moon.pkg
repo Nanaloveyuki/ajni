@@ -1,6 +1,7 @@
 import {
   "Nanaloveyuki/ajni/android",
   "Nanaloveyuki/ajni/webview",
+  "Nanaloveyuki/ajni/runtime",
 }
 
 pkgtype(kind: "executable")
@@ -13,6 +14,8 @@ options(
         "dispatch_webview:ajni_dispatch_webview_event",
         "create_int_callback:ajni_create_int_callback",
         "handled_observer_error:ajni_handled_observer_error",
+        "application_context_for_test:ajni_application_context_for_test",
+        "context_package_name_for_test:ajni_context_package_name_for_test",
       ],
     },
   },

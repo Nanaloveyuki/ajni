@@ -147,6 +147,17 @@ let subscription = @android.install_event_handler(event => match event {
 Looper. `@android.start_worker()` demonstrates a native-owned thread attaching
 to ART, posting back to the UI thread, then detaching.
 
+Since 0.3.6, `@android.application_context()` returns an owned checked
+`@runtime.JavaObject` for the application Context normalized from
+`NativeBridge.initialize(context)`. Acquire it on the main owner thread after
+initialization and close each independent handle when finished. Feature shutdown
+stops new acquisition with `RuntimeError::JavaThrown(IllegalStateException)`;
+existing handles remain valid until explicitly closed or their generic session
+closes. Non-Android targets, including desktop JNI, raise `UnsupportedTarget`.
+See the [Android Context contract](src/android/README.mbt.md#application-context)
+for initialization, identity and lifetime rules. Calls remain synchronous on the
+main thread; this does not supply an off-main blocking I/O path.
+
 Both Android and WebView dispatch capture observer snapshots with no order
 guarantee. Removal affects later snapshots; new observers miss the current event;
 nested dispatch synchronously takes a fresh snapshot. Direct exports/test emitters
@@ -156,9 +167,9 @@ shutdown does not clear handlers or installation state, wait for active
 calls/handlers, or cancel captured snapshots; admitted callbacks may finish.
 JNI unload separately waits for counted activity and releases native references.
 
-Synchronous failures distinguish `NotInitialized`, `RuntimeDestroyed`,
-`JavaException`, and `NativeFailure`. Outside Android, readiness is false and
-Android/WebView operations raise `NativeFailure` instead of simulated success.
+Legacy Android/WebView synchronous failures distinguish `NotInitialized`,
+`RuntimeDestroyed`, `JavaException`, and `NativeFailure`. Outside Android,
+readiness is false and those feature operations raise `NativeFailure`.
 Public `ajni.decode_utf8` is lossy and ignores an initial BOM; WebView event
 decoding is strict, preserves BOM, and drops malformed input. Raw JNI preserves
 NUL by length, paired surrogates as four-byte UTF-8, and replaces isolated Java

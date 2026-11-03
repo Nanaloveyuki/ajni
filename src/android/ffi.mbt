@@ -14,6 +14,9 @@ extern "C" fn native_install_event_callback(
 extern "C" fn native_runtime_ready() -> Int32 = "ajni_runtime_ready"
 
 ///|
+extern "C" fn native_android_supported() -> Int32 = "ajni_android_supported"
+
+///|
 extern "C" fn native_post_ui_callback() -> Int32 = "ajni_post_ui_callback"
 
 ///|

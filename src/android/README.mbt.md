@@ -40,11 +40,45 @@ provides the bundled host wrappers; the two callback helpers share its generic
 callback/session implementation and preserve Java errors through the JNI bridge.
 Call them only after host initialization on the runtime owner thread.
 
+The bundled Context acceptance fixture additionally defines
+`AJNI_CONTEXT_TEST_EXPORTS` and exports `application_context_for_test` as
+`ajni_application_context_for_test` and `context_package_name_for_test` as
+`ajni_context_package_name_for_test`. These staged instrumentation helpers are
+optional for custom executable hosts and are not application acquisition APIs.
+
 Initialization publishes feature readiness only after the generic session is
 open. JNI adapters reject non-owner managed dispatch before retaining closures
 or allocating managed event bytes. Worker threads only attach, post to the
 main Looper, and detach; they never enter MoonBit. Queued callbacks carry a
 feature generation and are discarded after shutdown or reinitialization.
+
+## Application Context
+
+Starting with ajni 0.3.6, `application_context() -> @runtime.JavaObject raise
+@runtime.RuntimeError` acquires the application Context supplied explicitly by
+`NativeBridge.initialize(context)`. The host normalizes Activity or wrapper input
+with `getApplicationContext()`, rejects null and conflicting active-host identities,
+and publishes the Context only after native initialization succeeds.
+
+Call on Android's main owner thread after initialization; package initialization
+is too early and raises `NotInitialized`. Each acquisition owns a separate global
+reference to the same Java object. Close it explicitly when finished. Closing one
+acquisition leaves other acquisitions usable; aliases of one handle share its
+close state. No Activity is retained by this interface.
+
+Feature shutdown clears the host's Context and new acquisition raises
+`JavaThrown` with the getter's original `IllegalStateException`. Existing Context
+handles and the generic session survive feature shutdown, and reinitialization
+enables acquisition again. Explicit generic `Session.close()` invalidates all old
+handles; reopening never rebinds them. Reinitialize the host before acquiring
+after a session close. Java lookup/getter exceptions retain their original
+Throwable. Non-native targets and native desktop JVM hosts raise
+`UnsupportedTarget` before resolving any Android classes.
+
+This is synchronous object access on the main thread. It does not provide an
+off-main asset-reading facility or permission Activity/result delivery. The
+existing native worker only posts back to the owner; never move JavaObject
+handles or MoonBit closures onto it for blocking I/O.
 
 ## Observers and stopping
 

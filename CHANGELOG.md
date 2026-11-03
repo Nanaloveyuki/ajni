@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.6
+
+- Add `android.application_context() -> @runtime.JavaObject raise @runtime.RuntimeError`, backed by the explicit Kotlin host's normalized application Context and the checked JNI runtime. Independent acquisitions own independent handles; aliases retain shared close state.
+- Publish Context only after successful native initialization, reject missing/conflicting application identities, and keep the private static getter's exact JVM name. Feature shutdown blocks acquisition with the original `IllegalStateException` while existing objects and callbacks retain their generic-session lifetime; session close/reopen rejects stale handles.
+- Reject Context acquisition on unsupported targets before Android class lookup, including native desktop hosts with a live JVM. Keep the descriptor-only root and legacy Android error contracts unchanged.
+- Add staged Android instrumentation for normalization, initialization rollback, independent ownership, shutdown/reinitialize, session close/reopen, owner gating and preserved Java errors; retain checked-JVM platform rejection coverage.
+- Verified locally on API37 x86_64 ART: all 11 instrumentation tests passed, including 3 Context tests and 8 existing host regressions. Linux/JDK21 checked-JNI Java/native hosting passed; native checks are warning-free, native and Wasm-GC Context rejection tests passed, and both-ABI NDK contract/build/lint plus package/release metadata gates passed. arm64/API24 runtime and R8-minified lookup remain unverified. Blocking asset I/O still requires a separate off-main execution path.
+
 ## 0.3.5
 
 - Move `create_int_callback` and `handled_observer_error` into the reusable `Nanaloveyuki/ajni/android` package; executable hosts delegate to these implementations and retain their final-link C exports without importing `android_runtime`.

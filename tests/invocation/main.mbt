@@ -132,6 +132,16 @@ fn imported_loader_regressions(
 ///|
 fn success(path : String, classes : String) -> Unit raise {
   let session = @invocation.create(path, options(classes))
+  let android_unsupported = try {
+    ignore(@android.application_context())
+    false
+  } catch {
+    @rt.UnsupportedTarget => true
+    _ => false
+  }
+  require(
+    android_unsupported, "Android Context is unsupported even with a live desktop JVM",
+  )
   let fixture = session.find_class(
     @jni.JniClass::parse("dev/nanaloveyuki/ajni/invocation/Fixture"),
   )

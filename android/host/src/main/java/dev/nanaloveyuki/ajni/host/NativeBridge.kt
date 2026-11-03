@@ -18,6 +18,7 @@ object NativeBridge {
   @Volatile private var runtimeGeneration = 0L
   private var nextRuntimeGeneration = 1L
   private var runtimeTransition = false
+  private var applicationContext: Context? = null
   private val mainHandler = Handler(Looper.getMainLooper())
 
   init {
@@ -27,7 +28,13 @@ object NativeBridge {
   fun initialize(context: Context) {
     requireMainThread("initialize")
     if (runtimeGeneration != 0L) {
-      nativeInitialize(context.applicationContext, runtimeGeneration)
+      val normalizedContext = requireNotNull(context.applicationContext) {
+        "NativeBridge requires an application Context"
+      }
+      check(normalizedContext === applicationContext) {
+        "NativeBridge is already initialized with a different application Context"
+      }
+      nativeInitialize(normalizedContext, runtimeGeneration)
       return
     }
     check(!runtimeTransition) { "NativeBridge lifecycle transition is in progress" }
@@ -35,7 +42,11 @@ object NativeBridge {
     check(generation > 0L) { "NativeBridge runtime generation exhausted" }
     runtimeTransition = true
     try {
-      nativeInitialize(context.applicationContext, generation)
+      val normalizedContext = requireNotNull(context.applicationContext) {
+        "NativeBridge requires an application Context"
+      }
+      nativeInitialize(normalizedContext, generation)
+      applicationContext = normalizedContext
       runtimeGeneration = generation
     } finally {
       runtimeTransition = false
@@ -47,6 +58,7 @@ object NativeBridge {
     if (runtimeGeneration == 0L) return
     runtimeTransition = true
     runtimeGeneration = 0L
+    applicationContext = null
     try {
       nativeShutdown()
     } finally {
@@ -56,6 +68,13 @@ object NativeBridge {
         runtimeTransition = false
       }
     }
+  }
+
+  @JvmStatic
+  private fun applicationContextForRuntime(): Context {
+    requireMainThread("applicationContextForRuntime")
+    check(runtimeGeneration != 0L) { "NativeBridge is not initialized" }
+    return checkNotNull(applicationContext) { "NativeBridge application Context is not available" }
   }
 
   internal fun currentRuntimeGeneration(): Long = runtimeGeneration
@@ -102,6 +121,21 @@ object NativeBridge {
     nativeCreateIntCallback()
 
   fun handledObserverErrorForTesting(): Boolean = nativeHandledObserverError()
+
+  fun applicationContextForTesting(stage: Int): Context {
+    requireMainThread("applicationContextForTesting")
+    return nativeApplicationContextForTesting(stage)
+  }
+
+  fun contextPackageNameForTesting(): String {
+    requireMainThread("contextPackageNameForTesting")
+    return nativeContextPackageNameForTesting()
+  }
+
+  fun contextCloseSessionForTesting() {
+    requireMainThread("contextCloseSessionForTesting")
+    nativeContextCloseSessionForTesting()
+  }
 
   fun attachWebViewContainer(container: FrameLayout) {
     AjniWebViewHost.attach(container)
@@ -187,5 +221,8 @@ object NativeBridge {
   @JvmStatic private external fun nativeEcho(value: String): String
   @JvmStatic private external fun nativeCreateIntCallback(): dev.nanaloveyuki.ajni.AjniCallback
   @JvmStatic private external fun nativeHandledObserverError(): Boolean
+  @JvmStatic private external fun nativeApplicationContextForTesting(stage: Int): Context
+  @JvmStatic private external fun nativeContextPackageNameForTesting(): String
+  @JvmStatic private external fun nativeContextCloseSessionForTesting()
   @JvmStatic private external fun nativeWebViewEvent(kind: Int, handle: Long, payload: String, detail: String)
 }

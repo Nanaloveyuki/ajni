@@ -152,6 +152,8 @@ JVM smoke 使用 `java -Xcheck:jni`，构建生成 C + 真实 runtime，断言�
 
 Android：`:host:checkJniContract` 以真实 NDK29 API24 对 arm64-v8a/x86_64、exports/callback 两配置检查 core/feature C 与 12 个 bridge native；debug APK、instrumentation APK、host/app lint 通过。用户 GUI 重启模拟器解决 adb offline 后，API37 x86_64 执行 `am instrument -w -r -e class dev.nanaloveyuki.ajni.demo.NativeBridgeInstrumentedTest dev.nanaloveyuki.ajni.demo.test/androidx.test.runner.AndroidJUnitRunner`，8 项全部通过：真实 typed callback/状态累积、foreign reject/close、observer 捕获异常不误抛、ActivityScenario.recreate、feature shutdown/reinit、Unicode、WebView 创建销毁/容器重建/消息与资源完成。demo 实际启动，截图观测 Surface 尺寸及渲染。arm64 设备、API24 运行、R8 lookup 和未覆盖失败注入不在该证据内。
 
+2026-11-03 ajni 0.3.6：`android.application_context()` 通过宿主私有 static getter 取得独立 global-ref 句柄；Kotlin 只保留显式输入规范化后的 application Context。API37 x86_64 上 11 项 instrumentation 全过，新增 3 项覆盖 Activity 规范化、失败/冲突初始化回滚、独立句柄/别名关闭、shutdown 后原 Java Throwable 与旧句柄、callback/subscription 跨重初始化存活、entry 外 Session 关闭/重开和 stale Closed、foreign native entry 拒绝。NDK API24 双 ABI 的 production、bundled acceptance、callback 配置均通过静态契约，APK/instrumentation 与 lint 通过；Linux/JDK21 双宿主 checked-JNI 通过，已初始化的桌面 JVM 仍拒绝 Android Context；native/Wasm-GC 各执行 1 项 unsupported 回归通过。arm64/API24 运行与 R8 lookup 仍未验证；Context 不提供 off-main 阻塞 I/O。
+
 - [MoonBit FFI](https://docs.moonbitlang.com/en/latest/language/ffi.html)：C ABI、FuncRef、ownership；latest文档与pin编译器有版本差异，以实际编译验证为准。
 - [JNI函数规范](https://docs.oracle.com/en/java/javase/21/docs/specs/jni/functions.html)：A系列调用、引用、异常、RegisterNatives。
 - [JNI Invocation](https://docs.oracle.com/en/java/javase/21/docs/specs/jni/invocation.html)：VM创建、线程、加载/卸载约束。

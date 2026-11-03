@@ -3,10 +3,17 @@ package "Nanaloveyuki/ajni/android"
 
 import {
   "Nanaloveyuki/ajni",
+  "Nanaloveyuki/ajni/runtime",
   "moonbitlang/core/debug",
 }
 
 // Values
+pub fn application_context() -> @runtime.JavaObject raise @runtime.RuntimeError
+
+pub fn application_context_for_test(UInt64, Int32, Bool) -> UInt64
+
+pub fn context_package_name_for_test(UInt64) -> UInt64
+
 pub fn create_int_callback(UInt64) -> UInt64
 
 pub fn dispatch_from_android(Int32, Int32, Int32) -> Unit

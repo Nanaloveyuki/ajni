@@ -41,3 +41,39 @@ pub extend AndroidEvent with Eq::{equal, not_equal}
 #deprecated("Use `Debug::to_repr` instead", skip_current_package=true)
 #doc(hidden)
 pub extend AndroidEvent with Debug::{to_repr}
+
+///|
+#cfg(not(target="native"))
+pub fn application_context() -> @runtime.JavaObject raise @runtime.RuntimeError {
+  raise @runtime.UnsupportedTarget
+}
+
+///|
+#cfg(not(target="native"))
+pub fn runtime_ready() -> Bool {
+  false
+}
+
+///|
+#cfg(not(target="native"))
+pub fn post_to_ui() -> Unit raise @ajni.JniError {
+  raise NativeFailure("Android UI callbacks are unsupported on this platform")
+}
+
+///|
+#cfg(not(target="native"))
+pub fn start_worker() -> Unit raise @ajni.JniError {
+  raise NativeFailure("Android native workers are unsupported on this platform")
+}
+
+///|
+#cfg(not(target="native"))
+pub fn emit_for_test(kind : Int32, first : Int32, second : Int32) -> Unit {
+  dispatch_native_event(kind, first, second)
+}
+
+///|
+#cfg(not(target="native"))
+fn ensure_callback_installed() -> Unit {
+  ()
+}

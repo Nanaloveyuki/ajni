@@ -2,12 +2,14 @@
 let handlers : Map[Int32, (AndroidEvent) -> Unit] = Map([])
 
 ///|
+#cfg(target="native")
 let callback_installation : Map[Int32, Unit] = Map([])
 
 ///|
 let next_handler_id : Ref[Int32] = Ref(1)
 
 ///|
+#cfg(target="native")
 fn ensure_callback_installed() -> Unit {
   if !callback_installation.contains(0) {
     let callback = fn(kind : Int32, first : Int32, second : Int32) {
@@ -41,6 +43,7 @@ pub fn remove_event_handler(id : Int32) -> Unit {
 ///|
 /// Requests a callback on Android's main Looper. The callback is asynchronous
 /// even if the caller is already on the UI thread.
+#cfg(target="native")
 pub fn post_to_ui() -> Unit raise @ajni.JniError {
   check_native_status(native_post_ui_callback())
 }
@@ -49,11 +52,13 @@ pub fn post_to_ui() -> Unit raise @ajni.JniError {
 /// Starts a native-owned worker thread. The bridge attaches it to the VM,
 /// then posts `WorkerAttached` and `UiTask` to the Android main Looper before
 /// detaching it.
+#cfg(target="native")
 pub fn start_worker() -> Unit raise @ajni.JniError {
   check_native_status(native_start_worker())
 }
 
 ///|
+#cfg(target="native")
 fn check_native_status(status : Int32) -> Unit raise @ajni.JniError {
   match status {
     1 => ()
@@ -65,12 +70,48 @@ fn check_native_status(status : Int32) -> Unit raise @ajni.JniError {
 }
 
 ///|
+#cfg(target="native")
 pub fn runtime_ready() -> Bool {
   native_runtime_ready() != 0
 }
 
 ///|
+/// Acquires an independently owned application Context on the Android owner.
+/// Feature shutdown stops acquisition; existing handles keep their session lifetime.
+#cfg(target="native")
+pub fn application_context() -> @runtime.JavaObject raise @runtime.RuntimeError {
+  if native_android_supported() == 0 {
+    raise @runtime.UnsupportedTarget
+  }
+  let session = @runtime.Session::current()
+  let host = session.find_class(
+    try! @ajni.JniClass::parse("dev/nanaloveyuki/ajni/host/NativeBridge"),
+  )
+  errdefer (host.object().close() catch { _ => () })
+  let context = {
+    let getter = host.static_method(
+      "applicationContextForRuntime",
+      try! @ajni.JniMethod::new(
+        [],
+        return_type=@ajni.JniType::object(
+          try! @ajni.JniClass::parse("android/content/Context"),
+        ),
+      ),
+    )
+    match getter.call([]) {
+      Object(Some(context)) => context
+      _ =>
+        raise @runtime.NativeFailure("Application Context getter returned null")
+    }
+  }
+  errdefer (context.close() catch { _ => () })
+  host.object().close()
+  context
+}
+
+///|
 /// Synchronously emits on the calling owner thread.
+#cfg(target="native")
 pub fn emit_for_test(kind : Int32, first : Int32, second : Int32) -> Unit {
   native_emit_for_test(kind, first, second)
 }

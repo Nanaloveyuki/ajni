@@ -12,7 +12,11 @@
     private static native java.lang.String nativeEcho(java.lang.String);
     private static native dev.nanaloveyuki.ajni.AjniCallback nativeCreateIntCallback();
     private static native boolean nativeHandledObserverError();
+    private static native android.content.Context nativeApplicationContextForTesting(int);
+    private static native java.lang.String nativeContextPackageNameForTesting();
+    private static native void nativeContextCloseSessionForTesting();
     private static native void nativeWebViewEvent(int, long, java.lang.String, java.lang.String);
+    private static android.content.Context applicationContextForRuntime();
     private static boolean postUiCallbackForRuntime(int, long);
     private static boolean webViewCommandForRuntime(int, long, java.lang.String, java.lang.String, long);
     private static boolean webViewSetBoundsForRuntime(long, int, int, int, int, long);
