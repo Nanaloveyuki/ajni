@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.5
+
+- Move `create_int_callback` and `handled_observer_error` into the reusable `Nanaloveyuki/ajni/android` package; executable hosts delegate to these implementations and retain their final-link C exports without importing `android_runtime`.
+- Upgrade the pinned compiler archive to `0.10.19+97801ee1b` and `moon` CLI to `0.1.20261029`, including CI's exact compiler assertion.
+- Align the dynamic loader and checked-JVM fixtures with their MoonBit 0.10.19 patch releases.
+
 ## 0.3.4
 
 - Add `NOTICE` with the third-party license inventory for linked, redistributed and build-time components, and require it in the publication file gate. `gradle/actions/setup-gradle@v6` is pinned to its MIT-covered `cache-provider: basic`, because v6's default enhanced cache loads the proprietary `gradle-actions-caching` component; Dependabot now requires a manual license review for `gradle/actions` major bumps.

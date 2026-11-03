@@ -7,10 +7,6 @@ import {
   "moonbitlang/core/quickcheck",
 } for "test"
 
-// ajni_bridge.c uses runtime's native stub; no managed API reference is needed.
-
-warnings = "-unused_package"
-
 options(
   "native-stub": [ "ajni_bridge.c" ],
   link: {

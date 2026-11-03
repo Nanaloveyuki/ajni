@@ -23,7 +23,7 @@ runs:
         [[ "$installed_version" == "moon $moon_version ("* ]]
         installed_compiler_version="$(moonc -v)"
         printf '%s\n' "$installed_compiler_version"
-        [[ "$installed_compiler_version" == "v0.10.18+6c83a7f62 (2026-10-28)" ]]
+        [[ "$installed_compiler_version" == "v0.10.19+97801ee1b (2026-10-30)" ]]
         moon version --all
     - name: Update MoonBit registry
       shell: bash --noprofile --norc -euo pipefail {0}

@@ -1,6 +1,4 @@
 import {
-  "Nanaloveyuki/ajni" @jni,
-  "Nanaloveyuki/ajni/runtime",
   "Nanaloveyuki/ajni/android",
   "Nanaloveyuki/ajni/webview",
 }

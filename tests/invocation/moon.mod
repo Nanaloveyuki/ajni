@@ -5,5 +5,5 @@ version = "0.0.0"
 preferred_target = "native"
 
 import {
-  "Nanaloveyuki/ajni@0.3.4",
+  "Nanaloveyuki/ajni@0.3.5",
 }

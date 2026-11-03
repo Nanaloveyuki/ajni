@@ -7,9 +7,13 @@ import {
 }
 
 // Values
+pub fn create_int_callback(UInt64) -> UInt64
+
 pub fn dispatch_from_android(Int32, Int32, Int32) -> Unit
 
 pub fn emit_for_test(Int32, Int32, Int32) -> Unit
+
+pub fn handled_observer_error() -> Int32
 
 pub fn install_event_handler((AndroidEvent) -> Unit) -> Int32
 

@@ -30,6 +30,16 @@ exception: observers may catch generic Java errors and return normally. Exports
 that return errors must convert them explicitly, preserving the original Java
 Throwable rather than reconstructing it from diagnostic text.
 
+Executable hosts import this library rather than `Nanaloveyuki/ajni/android_runtime`.
+Their final-link wrappers must export `dispatch_from_android` as
+`ajni_dispatch_event`, `create_int_callback` as `ajni_create_int_callback`, and
+`handled_observer_error` as `ajni_handled_observer_error`; optional WebView hosts
+also export `@webview.dispatch_from_android` as `ajni_dispatch_webview_event`.
+Dependency export lists are not inherited. The `android_runtime` executable
+provides the bundled host wrappers; the two callback helpers share its generic
+callback/session implementation and preserve Java errors through the JNI bridge.
+Call them only after host initialization on the runtime owner thread.
+
 Initialization publishes feature readiness only after the generic session is
 open. JNI adapters reject non-owner managed dispatch before retaining closures
 or allocating managed event bytes. Worker threads only attach, post to the
