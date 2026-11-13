@@ -1,6 +1,5 @@
 #include "../runtime/ajni_runtime.h"
 
-#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,7 +14,10 @@
 #endif
 
 /* Admission is native, not a managed flag that can race across host entry. */
+#if AJNI_INVOCATION_HAS_JNI
+#include <stdatomic.h>
 static atomic_int creation_attempted = 0;
+#endif
 
 typedef struct {
   char **values;
@@ -42,7 +44,11 @@ MOONBIT_FFI_EXPORT int ajni_invocation_supported(void) {
 }
 
 MOONBIT_FFI_EXPORT int ajni_invocation_has_attempted(void) {
+#if AJNI_INVOCATION_HAS_JNI
   return atomic_load_explicit(&creation_attempted, memory_order_acquire);
+#else
+  return 0;
+#endif
 }
 
 MOONBIT_FFI_EXPORT AjniInvocationOptions *ajni_invocation_options_new(int count) {
