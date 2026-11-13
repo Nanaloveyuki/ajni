@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.8
+
+- Match JNI runtime header export declarations with their definitions so MSVC can compile the unsupported-JNI fallback used by Windows consumers. Linux/JVM and Android behavior and the public MoonBit API are unchanged.
+- Add Windows native compile coverage to the build and release gates. This checks the unsupported-JNI fallback; it does not claim Windows JVM hosting support.
+
 ## 0.3.7
 
 - Pin compiler archive `0.10.20+65efd5b93` and `moon` CLI `0.1.20261104` for development, checked-JVM fixtures and CI.
