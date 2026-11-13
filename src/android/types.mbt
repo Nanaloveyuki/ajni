@@ -1,5 +1,6 @@
 ///|
 /// Android lifecycle values forwarded by the Kotlin bridge.
+#derive(Eq, Debug)
 pub(all) enum Lifecycle {
   Created
   Started
@@ -7,7 +8,7 @@ pub(all) enum Lifecycle {
   Paused
   Stopped
   Destroyed
-} derive(Eq, Debug)
+}
 
 ///|
 #deprecated("Use `==` instead", skip_current_package=true)
@@ -23,6 +24,7 @@ pub extend Lifecycle with Debug::{to_repr}
 /// Events delivered from the Android bridge. Every event handler runs on the
 /// Android main Looper; worker-originated events are first posted there by the
 /// JNI bridge.
+#derive(Eq, Debug)
 pub(all) enum AndroidEvent {
   Lifecycle(Lifecycle)
   SurfaceCreated(Int32, Int32)
@@ -30,7 +32,7 @@ pub(all) enum AndroidEvent {
   SurfaceDestroyed
   WorkerAttached
   UiTask
-} derive(Eq, Debug)
+}
 
 ///|
 #deprecated("Use `==` instead", skip_current_package=true)

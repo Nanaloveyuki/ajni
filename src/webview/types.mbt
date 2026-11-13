@@ -1,6 +1,7 @@
 ///|
 /// Events emitted by an Android WebView owned by the Kotlin host. Payloads are
 /// UTF-8 normalised before entering MoonBit.
+#derive(Eq, Debug)
 pub(all) enum EventKind {
   Created(String)
   NavigationStarted(String)
@@ -16,7 +17,7 @@ pub(all) enum EventKind {
   /// An asynchronous command failure correlated with the supplied operation ID.
   OperationFailed(String, String)
   Destroyed
-} derive(Eq, Debug)
+}
 
 ///|
 #deprecated("Use `==` instead", skip_current_package=true)
@@ -30,11 +31,12 @@ pub extend EventKind with Debug::{to_repr}
 
 ///|
 /// The mutually exclusive first document loaded by a newly created WebView.
+#derive(Eq, Debug)
 pub(all) enum InitialContent {
   Empty
   Url(String)
   Html(String, String)
-} derive(Eq, Debug)
+}
 
 ///|
 #deprecated("Use `==` instead", skip_current_package=true)
@@ -49,12 +51,13 @@ pub extend InitialContent with Debug::{to_repr}
 ///|
 /// Per-view host quotas. Zero disables an individual quota; negative values
 /// are rejected before the command crosses JNI.
+#derive(Eq, Debug)
 pub struct WebViewResourceLimits {
   max_page_message_bytes : Int32
   max_pending_asset_requests : Int32
   max_asset_response_bytes : Int32
   asset_response_timeout_millis : Int32
-} derive(Eq, Debug)
+}
 
 ///|
 #deprecated("Use `==` instead", skip_current_package=true)
@@ -84,10 +87,11 @@ pub fn WebViewResourceLimits::new(
 ///|
 /// An embedded asset request. The path is normalised by the Kotlin host before
 /// it enters MoonBit and must be answered through `respond_asset`.
+#derive(Eq, Debug)
 pub struct AssetRequest {
   id : String
   path : String
-} derive(Eq, Debug)
+}
 
 ///|
 #deprecated("Use `==` instead", skip_current_package=true)
@@ -102,10 +106,11 @@ pub extend AssetRequest with Debug::{to_repr}
 ///|
 /// A response header for an embedded asset. Header names and values are passed
 /// as UTF-8 bytes and must not contain transport delimiters.
+#derive(Eq, Debug)
 pub struct AssetHeader {
   name : String
   value : String
-} derive(Eq, Debug)
+}
 
 ///|
 #deprecated("Use `==` instead", skip_current_package=true)
@@ -125,13 +130,14 @@ pub fn AssetHeader::new(name~ : String, value~ : String) -> AssetHeader {
 ///|
 /// A complete embedded-asset response. The host owns timeout and pending
 /// request limits; this package only serialises the accepted response.
+#derive(Eq, Debug)
 pub struct AssetResponse {
   status : Int32
   mime_type : String
   encoding : String
   headers : Array[AssetHeader]
   body : Bytes
-} derive(Eq, Debug)
+}
 
 ///|
 #deprecated("Use `==` instead", skip_current_package=true)
@@ -156,10 +162,11 @@ pub fn AssetResponse::new(
 
 ///|
 /// A WebView callback paired with the caller-provided handle.
+#derive(Eq, Debug)
 pub struct Event {
   handle : Int64
   kind : EventKind
-} derive(Eq, Debug)
+}
 
 ///|
 #deprecated("Use `==` instead", skip_current_package=true)

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.7
+
+- Pin compiler archive `0.10.20+65efd5b93` and `moon` CLI `0.1.20261104` for development, checked-JVM fixtures and CI.
+- Migrate trait derivations to `#derive` without changing the public JNI or Android API.
+- Update the dynamic loader dependency to `Nanaloveyuki/dynlib@0.2.4` and align fixture module versions.
+
 ## 0.3.6
 
 - Add `android.application_context() -> @runtime.JavaObject raise @runtime.RuntimeError`, backed by the explicit Kotlin host's normalized application Context and the checked JNI runtime. Independent acquisitions own independent handles; aliases retain shared close state.

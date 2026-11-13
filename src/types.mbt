@@ -1,5 +1,6 @@
 ///|
 /// JNI failures represented as values at the MoonBit boundary.
+#derive(Debug)
 pub(all) suberror JniError {
   NotInitialized
   RuntimeDestroyed
@@ -10,7 +11,7 @@ pub(all) suberror JniError {
   DescriptorTooLong
   TooManyParameterSlots
   TooManyArrayDimensions
-} derive(Debug)
+}
 
 ///|
 #deprecated("Use `Debug::to_repr` instead", skip_current_package=true)

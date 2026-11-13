@@ -12,8 +12,8 @@ Before MoonBit 1.0, preserve the existing behavior while the general JNI seam is
 
 ## Development Setup
 
-Install toolchain archive `0.10.19+97801ee1b`, recorded in `.moonbit-toolchain`, JDK 21 for JVM smoke and Java 17 for Android builds.
-Its `moon` CLI version is `0.1.20261029`, recorded in `.moon-version`; archive IDs are compiler versions,
+Install toolchain archive `0.10.20+65efd5b93`, recorded in `.moonbit-toolchain`, JDK 21 for JVM smoke and Java 17 for Android builds.
+Its `moon` CLI version is `0.1.20261104`, recorded in `.moon-version`; archive IDs are compiler versions,
 not CLI versions. For Linux/macOS, pass the contents of `.moonbit-toolchain` to the official
 installer. On Windows, set `MOONBIT_INSTALL_VERSION` to the same archive ID before running
 the official PowerShell installer. Run `moon update` once to fetch the registry index; module

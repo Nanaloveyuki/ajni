@@ -26,10 +26,11 @@ fn mutf8_length_bounded(text : String, limit : Int32) -> Int32 raise JniError {
 
 ///|
 /// An internal JVM binary class name, for example `java/lang/String`.
+#derive(Eq, Debug)
 pub struct JniClass {
   priv internal_name : String
   priv internal_name_bytes : Int32
-} derive(Eq, Debug)
+}
 
 ///|
 #deprecated("Use `==` instead", skip_current_package=true)
@@ -74,12 +75,13 @@ pub fn JniClass::descriptor(self : JniClass) -> String {
 ///|
 /// A non-void JNI value type. Its parameter-slot width is retained so method
 /// descriptors cannot undercount `long` and `double`.
+#derive(Eq, Debug)
 pub struct JniType {
   priv descriptor : String
   priv descriptor_bytes : Int32
   priv parameter_slots : Int32
   priv array_dimensions : Int32
-} derive(Eq, Debug)
+}
 
 ///|
 #deprecated("Use `==` instead", skip_current_package=true)
@@ -208,9 +210,10 @@ pub fn JniType::descriptor(self : JniType) -> String {
 /// parameter slots, not a function-pointer ABI or an instance/static context.
 /// Instance invocation also needs a slot for `this` and permits at most 254
 /// explicit slots; current Kotlin native registrations are static.
+#derive(Eq, Debug)
 pub struct JniMethod {
   priv descriptor : String
-} derive(Eq, Debug)
+}
 
 ///|
 #deprecated("Use `==` instead", skip_current_package=true)
@@ -270,10 +273,11 @@ pub fn JniMethod::descriptor(self : JniMethod) -> String {
 ///|
 /// A native-method registration declaration without a raw function pointer.
 /// It validates the name and descriptor, not registration linkage or ABI.
+#derive(Eq, Debug)
 pub struct NativeMethod {
   priv name : String
   priv signature : JniMethod
-} derive(Eq, Debug)
+}
 
 ///|
 #deprecated("Use `==` instead", skip_current_package=true)

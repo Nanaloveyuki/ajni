@@ -34,31 +34,36 @@ pub fn set_bounds(Int64, Int32, Int32, Int32, Int32) -> Unit raise @ajni.JniErro
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub struct AssetHeader {
   name : String
   value : String
-} derive(Eq, @debug.Debug)
+}
 pub fn AssetHeader::new(name~ : String, value~ : String) -> Self
 
+#derive(Eq, @debug.Debug)
 pub struct AssetRequest {
   id : String
   path : String
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub struct AssetResponse {
   status : Int32
   mime_type : String
   encoding : String
   headers : Array[AssetHeader]
   body : Bytes
-} derive(Eq, @debug.Debug)
+}
 pub fn AssetResponse::new(status~ : Int32, mime_type~ : String, encoding? : String, headers? : Array[AssetHeader], body? : Bytes) -> Self
 
+#derive(Eq, @debug.Debug)
 pub struct Event {
   handle : Int64
   kind : EventKind
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) enum EventKind {
   Created(String)
   NavigationStarted(String)
@@ -70,20 +75,22 @@ pub(all) enum EventKind {
   AssetRequest(AssetRequest)
   OperationFailed(String, String)
   Destroyed
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) enum InitialContent {
   Empty
   Url(String)
   Html(String, String)
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub struct WebViewResourceLimits {
   max_page_message_bytes : Int32
   max_pending_asset_requests : Int32
   max_asset_response_bytes : Int32
   asset_response_timeout_millis : Int32
-} derive(Eq, @debug.Debug)
+}
 pub fn WebViewResourceLimits::new(max_page_message_bytes? : Int32, max_pending_asset_requests? : Int32, max_asset_response_bytes? : Int32, asset_response_timeout_millis? : Int32) -> Self
 
 // Type aliases

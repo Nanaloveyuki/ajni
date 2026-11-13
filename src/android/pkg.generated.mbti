@@ -35,6 +35,7 @@ pub fn start_worker() -> Unit raise @ajni.JniError
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum AndroidEvent {
   Lifecycle(Lifecycle)
   SurfaceCreated(Int32, Int32)
@@ -42,8 +43,9 @@ pub(all) enum AndroidEvent {
   SurfaceDestroyed
   WorkerAttached
   UiTask
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Lifecycle {
   Created
   Started
@@ -51,7 +53,7 @@ pub(all) enum Lifecycle {
   Paused
   Stopped
   Destroyed
-} derive(Eq, @debug.Debug)
+}
 
 // Type aliases
 

@@ -11,6 +11,7 @@ pub fn decode_utf8(BytesView) -> String
 pub fn encode_utf8(String) -> Bytes
 
 // Errors
+#derive(@debug.Debug)
 pub(all) suberror JniError {
   NotInitialized
   RuntimeDestroyed
@@ -21,25 +22,28 @@ pub(all) suberror JniError {
   DescriptorTooLong
   TooManyParameterSlots
   TooManyArrayDimensions
-} derive(@debug.Debug)
+}
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub struct JniClass {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn JniClass::descriptor(Self) -> String
 pub fn JniClass::internal_name(Self) -> String
 pub fn JniClass::parse(String) -> Self raise JniError
 
+#derive(Eq, @debug.Debug)
 pub struct JniMethod {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn JniMethod::descriptor(Self) -> String
 pub fn JniMethod::new(ArrayView[JniType], return_type? : JniType) -> Self raise JniError
 
+#derive(Eq, @debug.Debug)
 pub struct JniType {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn JniType::array(Self) -> Self raise JniError
 pub fn JniType::boolean() -> Self
 pub fn JniType::byte() -> Self
@@ -52,9 +56,10 @@ pub fn JniType::long() -> Self
 pub fn JniType::object(JniClass) -> Self
 pub fn JniType::short() -> Self
 
+#derive(Eq, @debug.Debug)
 pub struct NativeMethod {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn NativeMethod::descriptor(Self) -> String
 pub fn NativeMethod::name(Self) -> String
 pub fn NativeMethod::new(String, JniMethod) -> Self raise JniError
