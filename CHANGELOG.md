@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- Pin MoonBit compiler archive `1.0.0-rc1+3c0520448` and CLI `0.1.20261126`.
+- Update dynlib to 0.3.0 and export the Android and WebView bridges from native foreign-library packages.
+- Verify the checked JVM, Android JNI, and OpenHarmony API 26 native callbacks with the RC1 toolchain.
+
 ## 0.3.8
 
 - Match JNI runtime header export declarations with their definitions so MSVC can compile the unsupported-JNI fallback used by Windows consumers. Linux/JVM and Android behavior and the public MoonBit API are unchanged.

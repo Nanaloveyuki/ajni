@@ -1,6 +1,6 @@
 name = "Nanaloveyuki/ajni"
 
-version = "0.3.8"
+version = "0.4.0"
 
 description = "Checked bidirectional Java/MoonBit JNI runtime and Android host bridge."
 
@@ -17,5 +17,5 @@ preferred_target = "native"
 source = "src"
 
 import {
-  "Nanaloveyuki/dynlib@0.2.4",
+  "Nanaloveyuki/dynlib@0.3.0",
 }

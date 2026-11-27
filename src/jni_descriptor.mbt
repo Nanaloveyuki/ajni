@@ -255,7 +255,7 @@ pub fn JniMethod::new(
     }
     descriptor_units += parameter.descriptor.length()
   }
-  let builder = StringBuilder(size_hint=descriptor_units * 2)
+  let builder = StringBuilder(capacity=descriptor_units * 2)
   builder.write_char('(')
   for parameter in parameters {
     builder.write_string(parameter.descriptor)

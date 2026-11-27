@@ -13,12 +13,9 @@ import {
 
 warnings = "-unused_package"
 
+pkgtype(kind: "foreign_library")
+
 options(
   "native-stub": [ "ajni_webview_bridge.c" ],
-  link: {
-    "native": {
-      "exports": [ "dispatch_from_android:ajni_dispatch_webview_event" ],
-    },
-  },
   targets: { "ffi.mbt": [ "native" ] },
 )

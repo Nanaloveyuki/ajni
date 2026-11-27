@@ -119,6 +119,7 @@ pub fn emit_for_test(kind : Int32, first : Int32, second : Int32) -> Unit {
 ///|
 /// Synchronous export linked as `ajni_dispatch_event`; callers must be on the
 /// runtime owner. Snapshots have no order guarantee; nested dispatch is fresh.
+#export_name("ajni_dispatch_event")
 pub fn dispatch_from_android(
   kind : Int32,
   first : Int32,

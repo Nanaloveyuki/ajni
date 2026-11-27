@@ -256,6 +256,7 @@ fn valid_resource_limits(limits : WebViewResourceLimits) -> Bool {
 ///|
 /// Synchronous UTF-8 export; serialize with observer mutation. Dispatch snapshots
 /// have no order guarantee; nested dispatch takes a fresh snapshot on this thread.
+#export_name("ajni_dispatch_webview_event")
 pub fn dispatch_from_android(
   kind : Int32,
   handle : Int64,
